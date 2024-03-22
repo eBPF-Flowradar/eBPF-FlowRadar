@@ -8,6 +8,7 @@
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 #include <xdp/libxdp.h>
+#include <sys/resource.h>
 
 static int ifindex;
 struct xdp_program * prog = NULL;
@@ -18,16 +19,18 @@ static void int_exit(int sig)
     exit(0);
 }
 
-static void poll_stats(int map_fd, int poll_interval){
-	
-}
-
 int main(int argc, char *argv[])
 {
     int prog_fd, map_fd, ret;
     struct bpf_object *bpf_obj;
-
-    if (argc != 2) {
+	struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
+    
+	if(setrlimit(RLIMIT_MEMLOCK, &r)) {
+		fprintf(stderr, "ERROR:failed to set rlimit\n");
+		return 1;
+	}
+	
+	if (argc != 2) {
         printf("Usage: %s Interface_Name\n", argv[0]);
         return 1;
     }

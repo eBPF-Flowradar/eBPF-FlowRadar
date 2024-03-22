@@ -15,7 +15,8 @@
 
 #define BLOOM_FILTER_HASH_COUNT 7
 #define COUNTING_TABLE_HASH_COUNT 4
-#define BLOOM_FILTER_SIZE 30
+#define BLOOM_FILTER_SIZE 240000
+#define COUNTING_TABLE_SIZE 30000
 #define FLOW_KEY_SIZE 13
 
 struct network_flow{
@@ -24,6 +25,12 @@ struct network_flow{
 	__u16 source_port;
 	__u16 dest_port;
 	__u8 protocol;
+};
+
+struct counting_table_entry {
+	__u32 flowXOR;
+	__u32 flowCount;
+	__u32 packetCount;
 };
 
 static __always_inline
@@ -51,12 +58,21 @@ void print_flow(struct network_flow netflow) {
 	bpf_printk("%u.%u.%u.%-3u\t%u.%u.%u.%-3u\t%-3u\t%-3u\t%-3u",octet0, octet1, octet2, octet3, octet4, octet5, octet6, octet7, netflow.source_port, netflow.dest_port, netflow.protocol);
 }
 
+// Define the Bloom Filter
 struct {
 	__uint(type, BPF_MAP_TYPE_BLOOM_FILTER);
 	__type(value, struct network_flow);
 	__uint(max_entries, BLOOM_FILTER_SIZE);
 	__uint(map_extra, BLOOM_FILTER_HASH_COUNT);
 } bloom_filter SEC(".maps");
+
+// Define the Counting Table 
+struct {
+	__uint(type, BPF_MAP_TYPE_ARRAY);
+	__type(key, __u32);
+	__type(value, struct counting_table_entry);
+	__uint(max_entries, COUNTING_TABLE_SIZE);
+} counting_table SEC(".maps");
 
 // k = seed value // which slice
 // hostID = host Num;
