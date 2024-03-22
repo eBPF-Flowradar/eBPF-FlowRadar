@@ -11,6 +11,7 @@
 #include <linux/icmp.h>
 #include <linux/if_vlan.h>
 #include <linux/if_ether.h>
+#include "hashutils.h"
 
 
 #define BLOOM_FILTER_HASH_COUNT 7
@@ -33,31 +34,6 @@ struct counting_table_entry {
 	__u32 packetCount;
 };
 
-static __always_inline
-void print_flow(struct network_flow netflow) {
-	__u32 src_ip = netflow.source_ip;
-	
-	__u8 octet0 = src_ip % 256;
-	src_ip/=256;
-	__u8 octet1 = src_ip % 256;
-	src_ip/=256;
-	__u8 octet2 = src_ip % 256;
-	src_ip/=256;
-	__u8 octet3 = src_ip % 256;
-
-	__u32 dst_ip = netflow.dest_ip;
-
-	__u8 octet4 = dst_ip % 256;
-	dst_ip /= 256;
-	__u8 octet5 = dst_ip % 256;
-	dst_ip /= 256;
-	__u8 octet6 = dst_ip % 256;
-	dst_ip /= 256;
-	__u8 octet7 = dst_ip % 256;
-
-	bpf_printk("%u.%u.%u.%-3u\t%u.%u.%u.%-3u\t%-3u\t%-3u\t%-3u",octet0, octet1, octet2, octet3, octet4, octet5, octet6, octet7, netflow.source_port, netflow.dest_port, netflow.protocol);
-}
-
 // Define the Bloom Filter
 struct {
 	__uint(type, BPF_MAP_TYPE_BLOOM_FILTER);
@@ -69,10 +45,122 @@ struct {
 // Define the Counting Table 
 struct {
 	__uint(type, BPF_MAP_TYPE_ARRAY);
-	__type(key, __u32);
+	__type(key, int);
 	__type(value, struct counting_table_entry);
 	__uint(max_entries, COUNTING_TABLE_SIZE);
 } counting_table SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_ARRAY);
+	__type(key, int);
+	__type(value, __u8);
+	__uint(max_entries, 13);
+} flow_key SEC(".maps");
+
+
+static inline __u32 jhash(__u32 initval) {
+	
+	__u32 a, b, c;
+	a = b = c = JHASH_INITVAL + 13 + initval;
+	
+	int j = 0;
+	
+	__u32 k0 = 0;
+	__u32 k4 = 0;
+	__u32 k8 = 0;
+	__u32 k12 = 0;
+
+	for (int i = 0 ; i < 4 ; ++i) {
+		j = i;
+		__u8 * v = bpf_map_lookup_elem(&flow_key, &j);
+		if (v){
+			k0 |= *v;
+		}
+		k0 = k0 << 8;
+	}
+	
+	for(int i = 4 ; i < 8 ; ++i) {
+		j = i;
+		__u8 * v = bpf_map_lookup_elem(&flow_key, &j);
+		if(v){
+			k4 |= *v;
+		}
+		k4 = k4 << 8;
+	}
+
+	for(int i = 8 ; i < 12 ; ++i) {
+		j = i;
+		__u8 * v = bpf_map_lookup_elem(&flow_key, &j);
+		if(v){
+			k8 |= *v;
+		}
+		k8 = k8 << 8;
+	}
+	
+	j = 12;
+	__u8 * v = bpf_map_lookup_elem(&flow_key, &j);
+	
+	if (v) {
+		k12 = *v;
+	}
+
+	a += k12;
+	__jhash_final(a, b, c);
+	
+	return c; 
+}
+
+int flow_key_generator_function(struct network_flow * flow) {
+	
+	if (flow == NULL) {
+		return -1;
+	}
+	
+	__u32 src_ip = flow->source_ip;
+	__u32 dst_ip = flow->dest_ip;
+	__u16 src_port = flow->source_port;
+	__u16 dst_port = flow->dest_port;
+	__u8 protocol = flow->protocol;
+	// Flow
+	
+	// Parse the Source IP;
+	int j = 0;
+	for (int i = 0 ; i < 4 ; ++i) {
+		__u8 byte = (__u8) src_ip;
+		j = i;
+		bpf_map_update_elem(&flow_key, &j, &byte, BPF_ANY);
+		src_ip = src_ip >> 8;
+	}
+	// Parse the Destination IP
+	for (int i = 4 ; i < 8 ; ++i) {
+		__u8 byte = (__u8) dst_ip;
+		j = i;
+		bpf_map_update_elem(&flow_key, &j, &byte, BPF_ANY);
+		dst_ip = dst_ip >> 8;
+	}
+	// Parse the Source Port
+	for (int i = 8 ; i < 10 ; ++i) {
+		__u8 byte = (__u8) src_port;
+		j = i;
+		bpf_map_update_elem(&flow_key, &j, &byte, BPF_ANY);
+		src_port = src_port >> 8;
+	}
+	// Parse the Destination Port
+	for (int i = 10 ; i < 12 ; ++i) {
+		__u8 byte = (__u8) dst_port;
+		j = i;
+		bpf_map_update_elem(&flow_key, &j, &byte, BPF_ANY);
+		dst_port = dst_port >> 8;
+	}	
+	
+	j = 12;
+
+	bpf_map_update_elem(&flow_key, &j, &protocol, BPF_EXIST);
+
+	return 0;
+}
+
+
 
 // k = seed value // which slice
 // hostID = host Num;
@@ -136,25 +224,26 @@ int xdp_parse_flow(struct xdp_md * ctx) {
 	
 	// generate_flow_key();
 	struct network_flow nflow = (struct network_flow){.source_ip = source_ip, .dest_ip = dest_ip, .source_port = source_port, .dest_port = dest_port, .protocol = protocol};
-	print_flow(nflow);
-	struct network_flow * nf = NULL;
+	// print_flow(nflow);
+	// struct network_flow * nf = NULL;
 
-	int ret = bpf_map_peek_elem(&bloom_filter, &nf);
+	// int ret = bpf_map_peek_elem(&bloom_filter, &nf);
 	
-	if(ret==0){
-		bpf_printk("Flow Already exists");
-	} else {
-		bpf_printk("Adding a new flow");
-		bpf_map_push_elem(&bloom_filter, &nflow, BPF_ANY);
+	// Initialize FlowKey to Zero zero zero ... zero
+	
+	int ret = flow_key_generator_function(&nflow);
+
+	if (ret < 0) {
+		bpf_printk("Key Generation Failed");
+		return XDP_PASS;
+	} else{
+		bpf_printk("Key Generation Successful");
 	}
+
+	__u32 computed_hash = jhash(0);
+	bpf_printk("%u", computed_hash);
 
 	return XDP_PASS;
 }
 
-
-
-
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
-
-
-
