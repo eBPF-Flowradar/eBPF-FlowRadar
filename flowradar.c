@@ -13,14 +13,20 @@
 static int ifindex;
 struct xdp_program * prog = NULL;
 
+struct counting_table_entry {
+    __u32 flowXOR;
+    __u32 flowCount;
+    __u32 packetCount;
+};
+
 static void int_exit(int sig)
 {
     xdp_program__close(prog);
     exit(0);
 }
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
+    
     int prog_fd, map_fd, ret;
     struct bpf_object *bpf_obj;
 	struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
@@ -29,7 +35,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "ERROR:failed to set rlimit\n");
 		return 1;
 	}
-	
+
 	if (argc != 2) {
         printf("Usage: %s Interface_Name\n", argv[0]);
         return 1;
@@ -52,6 +58,14 @@ int main(int argc, char *argv[])
     if (ret) {
         printf("Error, Set xdp fd on %d failed\n", ifindex);
         return ret;
+    }
+
+    bpf_obj = xdp_program__bpf_obj(prog);
+    map_fd = bpf_object__find_map_fd_by_name(bpf_obj, "counting_table");
+    
+    if (map_fd < 0) {
+        printf("Error, get map fd from bpf obj failed\n");
+        return map_fd;
     }
 
     signal(SIGINT, int_exit);

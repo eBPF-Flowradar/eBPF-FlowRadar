@@ -9,16 +9,19 @@
 #include <linux/tcp.h>
 #include <linux/udp.h>
 #include <linux/icmp.h>
+#include <stdbool.h>
+#include <linux/icmp.h>
 #include <linux/if_vlan.h>
 #include <linux/if_ether.h>
 #include "hashutils.h"
 
 
-#define BLOOM_FILTER_HASH_COUNT 7
-#define COUNTING_TABLE_HASH_COUNT 4
-#define BLOOM_FILTER_SIZE 240000
-#define COUNTING_TABLE_SIZE 30000
+#define BLOOM_FILTER_HASH_COUNT 4
+#define COUNTING_TABLE_HASH_COUNT 2
+#define BLOOM_FILTER_SIZE 240
+#define COUNTING_TABLE_SIZE 16
 #define FLOW_KEY_SIZE 13
+#define BUCKET_SIZE 7500
 
 struct network_flow{
 	__u32 source_ip;
@@ -160,8 +163,61 @@ int flow_key_generator_function(struct network_flow * flow) {
 	return 0;
 }
 
+static __always_inline 
+__u32 compute_flowXOR(struct network_flow * flow) {
+		return flow->source_ip ^ flow->dest_ip ^ flow->source_port ^ flow->dest_port ^ flow->protocol;
+}
 
+static __always_inline
+int insert_flow_to_counting_table(struct network_flow * flow, bool old_flow) {
+	
+	int num_buckets = COUNTING_TABLE_HASH_COUNT;
 
+	flow_key_generator_function(flow);
+	__u32 flowXOR = compute_flowXOR(flow);
+
+	for(int  i = 0 ; i < num_buckets ; ++i) {
+		
+		__u32 j = i;
+
+		struct counting_table_entry *ct = NULL;
+	
+		int bucket_index = jhash(j) % COUNTING_TABLE_SIZE;
+		// Hash Value % BUCKET_SIZE 7500;
+	
+		if(old_flow == true) {
+			// Packet Comes from an existing flow
+			ct = bpf_map_lookup_elem(&counting_table, &bucket_index);
+			if(ct){
+				ct->flowXOR ^= flowXOR;
+				ct->packetCount++;
+				struct counting_table_entry cte = *ct;
+				cte.flowXOR = ct->flowXOR ^ flowXOR;
+				cte.packetCount = ct->packetCount + 1;
+				bpf_map_update_elem(&counting_table, &bucket_index, &cte, BPF_EXIST);
+			} else {
+				return -1;
+			}
+		} else {
+			// Packet Comes from a new flow
+			ct = bpf_map_lookup_elem(&counting_table, &bucket_index);
+			if(ct){
+				ct->flowXOR ^= flowXOR;
+				ct->packetCount++;
+				ct->flowCount++;
+				struct counting_table_entry cte = *ct;
+				cte.flowXOR ^= ct->flowXOR;
+				cte.packetCount = ct->packetCount;
+				cte.flowCount = ct->flowCount;
+				bpf_map_update_elem(&counting_table, &bucket_index, &cte, BPF_EXIST);
+			} else{
+				return -1;
+			}
+		}
+	}
+
+	return 0;
+}
 // k = seed value // which slice
 // hostID = host Num;
 // flow sh;
@@ -200,23 +256,26 @@ int xdp_parse_flow(struct xdp_md * ctx) {
 	__u32 dest_port = 0;
 
 	if(ip->protocol == IPPROTO_TCP){
+		
 		if(data + sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct tcphdr) >= data_end){
 			return XDP_PASS;
 		}
+		
 		struct tcphdr * tcp = data + sizeof(struct ethhdr) + sizeof(struct iphdr);
 		source_port = tcp->source;
 		dest_port = tcp->dest;
 	}
 	else if(ip->protocol == IPPROTO_UDP){
+		
 		if(data + sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct tcphdr) >= data_end) {
 			return XDP_PASS;
 		}
+		
 		struct udphdr * udp = data + sizeof(struct ethhdr) + sizeof(struct iphdr);
 		source_port = udp->source;
 		dest_port = udp->dest;
 	}
 	else if(ip->protocol == IPPROTO_ICMP) {
-		bpf_printk("ICMP Packet");
 		return XDP_PASS;
 	}
 	
@@ -226,23 +285,17 @@ int xdp_parse_flow(struct xdp_md * ctx) {
 	struct network_flow nflow = (struct network_flow){.source_ip = source_ip, .dest_ip = dest_ip, .source_port = source_port, .dest_port = dest_port, .protocol = protocol};
 	// print_flow(nflow);
 	// struct network_flow * nf = NULL;
+	flow_key_generator_function(&nflow);
 
-	// int ret = bpf_map_peek_elem(&bloom_filter, &nf);
-	
-	// Initialize FlowKey to Zero zero zero ... zero
-	
-	int ret = flow_key_generator_function(&nflow);
+	bool old_flow = false;
 
-	if (ret < 0) {
-		bpf_printk("Key Generation Failed");
-		return XDP_PASS;
-	} else{
-		bpf_printk("Key Generation Successful");
+	if (bpf_map_peek_elem(&bloom_filter, &nflow) == 0) {
+		// Element In Bloom Filter;
+		old_flow = true;
 	}
-
-	__u32 computed_hash = jhash(0);
-	bpf_printk("%u", computed_hash);
-
+	
+	insert_flow_to_counting_table(&nflow, old_flow);
+	
 	return XDP_PASS;
 }
 
