@@ -32,7 +32,7 @@ struct network_flow{
 };
 
 struct counting_table_entry {
-	__u32 flowXOR;
+	__u128 flowXOR;
 	__u32 flowCount;
 	__u32 packetCount;
 };
@@ -40,7 +40,7 @@ struct counting_table_entry {
 // Define the Bloom Filter
 struct {
 	__uint(type, BPF_MAP_TYPE_BLOOM_FILTER);
-	__type(value, struct network_flow);
+	__type(value, __u128);
 	__uint(max_entries, BLOOM_FILTER_SIZE);
 	__uint(map_extra, BLOOM_FILTER_HASH_COUNT);
 } bloom_filter SEC(".maps");
@@ -53,67 +53,37 @@ struct {
 	__uint(max_entries, COUNTING_TABLE_SIZE);
 } counting_table SEC(".maps");
 
-struct {
-	__uint(type, BPF_MAP_TYPE_ARRAY);
-	__type(key, int);
-	__type(value, __u8);
-	__uint(max_entries, 13);
-} flow_key SEC(".maps");
 
-
-static inline __u32 jhash(__u32 initval) {
+static inline __u32 jhash(__u128 flow_key,  __u32 initval) {
 	
 	__u32 a, b, c;
 	a = b = c = JHASH_INITVAL + 13 + initval;
-	
-	int j = 0;
 	
 	__u32 k0 = 0;
 	__u32 k4 = 0;
 	__u32 k8 = 0;
 	__u32 k12 = 0;
 
-	for (int i = 0 ; i < 4 ; ++i) {
-		j = i;
-		__u8 * v = bpf_map_lookup_elem(&flow_key, &j);
-		if (v){
-			k0 |= *v;
-		}
-		k0 = k0 << 8;
-	}
-	
-	for(int i = 4 ; i < 8 ; ++i) {
-		j = i;
-		__u8 * v = bpf_map_lookup_elem(&flow_key, &j);
-		if(v){
-			k4 |= *v;
-		}
-		k4 = k4 << 8;
-	}
+	k0 = flow_key;
+	a += k0;
+	flow_key = flow_key >> 32;
 
-	for(int i = 8 ; i < 12 ; ++i) {
-		j = i;
-		__u8 * v = bpf_map_lookup_elem(&flow_key, &j);
-		if(v){
-			k8 |= *v;
-		}
-		k8 = k8 << 8;
-	}
-	
-	j = 12;
-	__u8 * v = bpf_map_lookup_elem(&flow_key, &j);
-	
-	if (v) {
-		k12 = *v;
-	}
+	k4 = flow_key;
+	b += k4;
+	flow_key = flow_key >> 32;
 
+	k8 = flow_key;
+	c += k8;
+	flow_key = flow_key >> 32;
+
+	k12 = flow_key;
 	a += k12;
 	__jhash_final(a, b, c);
 	
 	return c; 
 }
 
-int flow_key_generator_function(struct network_flow * flow) {
+__u128 flow_key_generator_function(struct network_flow * flow) {
 	
 	if (flow == NULL) {
 		return -1;
@@ -125,56 +95,45 @@ int flow_key_generator_function(struct network_flow * flow) {
 	__u16 dst_port = flow->dest_port;
 	__u8 protocol = flow->protocol;
 	// Flow
-	
+	__u128 flowKey = 0;
 	// Parse the Source IP;
-	int j = 0;
 	for (int i = 0 ; i < 4 ; ++i) {
 		__u8 byte = (__u8) src_ip;
-		j = i;
-		bpf_map_update_elem(&flow_key, &j, &byte, BPF_ANY);
+		flowKey |= byte;
+		flowKey = flowKey << 8;
 		src_ip = src_ip >> 8;
 	}
 	// Parse the Destination IP
-	for (int i = 4 ; i < 8 ; ++i) {
+	for (int i = 0 ; i < 4 ; ++i) {
 		__u8 byte = (__u8) dst_ip;
-		j = i;
-		bpf_map_update_elem(&flow_key, &j, &byte, BPF_ANY);
+		flowKey |= byte;
+		flowKey = flowKey << 8;
 		dst_ip = dst_ip >> 8;
 	}
 	// Parse the Source Port
-	for (int i = 8 ; i < 10 ; ++i) {
+	for (int i = 0 ; i < 2 ; ++i) {
 		__u8 byte = (__u8) src_port;
-		j = i;
-		bpf_map_update_elem(&flow_key, &j, &byte, BPF_ANY);
+		flowKey |= byte;
+		flowKey = flowKey << 8;
 		src_port = src_port >> 8;
 	}
 	// Parse the Destination Port
-	for (int i = 10 ; i < 12 ; ++i) {
+	for (int i = 0 ; i < 2 ; ++i) {
 		__u8 byte = (__u8) dst_port;
-		j = i;
-		bpf_map_update_elem(&flow_key, &j, &byte, BPF_ANY);
+		flowKey |= byte;
+		flowKey = flowKey << 8;
 		dst_port = dst_port >> 8;
 	}	
 	
-	j = 12;
-
-	bpf_map_update_elem(&flow_key, &j, &protocol, BPF_EXIST);
-
-	return 0;
+	flowKey |= protocol;
+	return flowKey;
 }
 
-static __always_inline 
-__u32 compute_flowXOR(struct network_flow * flow) {
-		return flow->source_ip ^ flow->dest_ip ^ flow->source_port ^ flow->dest_port ^ flow->protocol;
-}
 
 static __always_inline
-int insert_flow_to_counting_table(struct network_flow * flow, bool old_flow) {
+int insert_flow_to_counting_table(__u128 flowKey, bool old_flow) {
 	
 	int num_buckets = COUNTING_TABLE_HASH_COUNT;
-
-	flow_key_generator_function(flow);
-	__u32 flowXOR = compute_flowXOR(flow);
 
 	for(int  i = 0 ; i < num_buckets ; ++i) {
 		
@@ -182,17 +141,15 @@ int insert_flow_to_counting_table(struct network_flow * flow, bool old_flow) {
 
 		struct counting_table_entry *ct = NULL;
 	
-		int bucket_index = jhash(j) % COUNTING_TABLE_SIZE;
+		int bucket_index = jhash(j, flowKey) % COUNTING_TABLE_SIZE;
 		// Hash Value % BUCKET_SIZE 7500;
 	
 		if(old_flow == true) {
 			// Packet Comes from an existing flow
 			ct = bpf_map_lookup_elem(&counting_table, &bucket_index);
 			if(ct){
-				ct->flowXOR ^= flowXOR;
-				ct->packetCount++;
 				struct counting_table_entry cte = *ct;
-				cte.flowXOR = ct->flowXOR ^ flowXOR;
+				cte.flowXOR = ct->flowXOR ^ flowKey;
 				cte.packetCount = ct->packetCount + 1;
 				bpf_map_update_elem(&counting_table, &bucket_index, &cte, BPF_EXIST);
 			} else {
@@ -202,13 +159,10 @@ int insert_flow_to_counting_table(struct network_flow * flow, bool old_flow) {
 			// Packet Comes from a new flow
 			ct = bpf_map_lookup_elem(&counting_table, &bucket_index);
 			if(ct){
-				ct->flowXOR ^= flowXOR;
-				ct->packetCount++;
-				ct->flowCount++;
 				struct counting_table_entry cte = *ct;
-				cte.flowXOR ^= ct->flowXOR;
-				cte.packetCount = ct->packetCount;
-				cte.flowCount = ct->flowCount;
+				cte.flowXOR ^= flowKey;
+				cte.packetCount++;
+				cte.flowCount++;
 				bpf_map_update_elem(&counting_table, &bucket_index, &cte, BPF_EXIST);
 			} else{
 				return -1;
@@ -285,16 +239,18 @@ int xdp_parse_flow(struct xdp_md * ctx) {
 	struct network_flow nflow = (struct network_flow){.source_ip = source_ip, .dest_ip = dest_ip, .source_port = source_port, .dest_port = dest_port, .protocol = protocol};
 	// print_flow(nflow);
 	// struct network_flow * nf = NULL;
-	flow_key_generator_function(&nflow);
+	__u128 flowKey = flow_key_generator_function(&nflow);
 
 	bool old_flow = false;
 
-	if (bpf_map_peek_elem(&bloom_filter, &nflow) == 0) {
+	if (bpf_map_peek_elem(&bloom_filter, &flowKey) == 0) {
 		// Element In Bloom Filter;
 		old_flow = true;
+	} else {
+		bpf_map_push_elem(&bloom_filter, &flowKey, BPF_NOEXIST);
 	}
 	
-	insert_flow_to_counting_table(&nflow, old_flow);
+	insert_flow_to_counting_table(flowKey, old_flow);
 	
 	return XDP_PASS;
 }
