@@ -9,20 +9,32 @@
 #include <bpf/libbpf.h>
 #include <xdp/libxdp.h>
 #include <sys/resource.h>
+#include "flowradar.h"
+#include "single_decode.h"
 
 static int ifindex;
 struct xdp_program * prog = NULL;
-
-struct counting_table_entry {
-    __u32 flowXOR;
-    __u32 flowCount;
-    __u32 packetCount;
-};
 
 static void int_exit(int sig)
 {
     xdp_program__close(prog);
     exit(0);
+}
+
+static void perform_single_decode(int counting_table_file_descriptor) {
+    
+    struct flowset flow_set;
+    
+    for(int i = 0 ; i < COUNTING_TABLE_SIZE ; ++i) {
+        struct counting_table_entry cte;
+        int ret = bpf_map_lookup_elem(&counting_table_file_descriptor, &i, &cte);
+        if(ret == 0) {
+            flow_set.counting_table[i] = cte;
+        }
+    }
+
+    struct pureset_packet_count pspc = single_decode(flow_set);
+    
 }
 
 int main(int argc, char *argv[]) {

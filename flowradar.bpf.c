@@ -14,7 +14,7 @@
 #include <linux/if_vlan.h>
 #include <linux/if_ether.h>
 #include "hashutils.h"
-
+#include "flowradar.h"
 
 #define BLOOM_FILTER_HASH_COUNT 4
 #define COUNTING_TABLE_HASH_COUNT 2
@@ -22,20 +22,6 @@
 #define COUNTING_TABLE_SIZE 16
 #define FLOW_KEY_SIZE 13
 #define BUCKET_SIZE 7500
-
-struct network_flow{
-	__u32 source_ip;
-	__u32 dest_ip;
-	__u16 source_port;
-	__u16 dest_port;
-	__u8 protocol;
-};
-
-struct counting_table_entry {
-	__u128 flowXOR;
-	__u32 flowCount;
-	__u32 packetCount;
-};
 
 // Define the Bloom Filter
 struct {
@@ -54,38 +40,6 @@ struct {
 } counting_table SEC(".maps");
 
 
-static inline __u32 jhash(struct network_flow flow,  __u32 initval) {
-	
-	__u128 flow_key = 0;
-	memcpy(&flow_key, &flow, sizeof(struct network_flow));
-
-	__u32 a, b, c;
-	a = b = c = JHASH_INITVAL + 13 + initval;
-	
-	__u32 k0 = 0;
-	__u32 k4 = 0;
-	__u32 k8 = 0;
-	__u32 k12 = 0;
-
-	k0 = flow_key;
-	a += k0;
-	flow_key = flow_key >> 32;
-
-	k4 = flow_key;
-	b += k4;
-	flow_key = flow_key >> 32;
-
-	k8 = flow_key;
-	c += k8;
-	flow_key = flow_key >> 32;
-
-	k12 = flow_key;
-	a += k12;
-	__jhash_final(a, b, c);
-	
-	return c; 
-}
-
 static __always_inline
 int insert_flow_to_counting_table(struct network_flow flow, bool old_flow) {
 	
@@ -94,8 +48,6 @@ int insert_flow_to_counting_table(struct network_flow flow, bool old_flow) {
 	
 	__u128 flowKey = 0;
 	memcpy(&flowKey, &flow, sizeof(struct network_flow));
-	
-	bpf_printk("flowKey: %u", flowKey);
 
 	for(int  i = 0 ; i < num_buckets ; ++i) {
 		
@@ -103,7 +55,7 @@ int insert_flow_to_counting_table(struct network_flow flow, bool old_flow) {
 
 		struct counting_table_entry *ct = NULL;
 	
-		int bucket_index = jhash(flow, j) % COUNTING_TABLE_SIZE;
+		int bucket_index = jhash_flow(flow, j) % COUNTING_TABLE_SIZE;
 		// Hash Value % BUCKET_SIZE 7500;
 	
 		if(old_flow == true) {
