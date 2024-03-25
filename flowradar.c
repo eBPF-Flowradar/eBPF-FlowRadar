@@ -27,7 +27,8 @@ static void int_exit(int sig) {
   exit(0);
 }
 
-static void perform_single_decode(int counting_table_file_descriptor) {
+static struct pureset_packet_count
+perform_single_decode(int counting_table_file_descriptor) {
 
   struct flowset flow_set;
 
@@ -39,7 +40,7 @@ static void perform_single_decode(int counting_table_file_descriptor) {
     }
   }
 
-  struct pureset_packet_count pspc = single_decode(flow_set);
+  return single_decode(flow_set);
 }
 
 static void initialize_bloom_filter(int flow_filter_file_descriptor) {
@@ -155,6 +156,14 @@ static void print_entry_counting_table(int counting_table_file_descriptor,
     }
 
     loop++;
+
+    // struct pureset_packet_count pspc =
+    //     perform_single_decode(counting_table_file_descriptor);
+    // for (int i = 0; i < pspc.flowset.latest_index; i++) {
+    //   printf("%" PRIx64 "%016" PRIx64 "\n",
+    //          (uint64_t)(pspc.flowset.purecells[i] >> 64),
+    //          (uint64_t)pspc.flowset.purecells[i]);
+    // }
     sleep(poll_interval);
   }
 }
