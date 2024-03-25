@@ -15,6 +15,7 @@
 #include <linux/if_ether.h>
 #include "hashutils.h"
 #include "flowradar.h"
+#include <inttypes.h>
 
 #define BLOOM_FILTER_HASH_COUNT 7
 #define COUNTING_TABLE_HASH_COUNT 4
@@ -50,15 +51,24 @@ struct {
 
 static __always_inline
 int insert_to_flow_filter(struct network_flow flow) {
-
+	
+	bpf_printk("source_ip: %u, dest_ip: %u, source_port: %u, dest_port: %u, protocol: %u", flow.source_ip, flow.dest_ip, flow.source_port, flow.dest_port, flow.protocol);
 	__u128 flow_key = 0;
 	memcpy(&flow_key, &flow, sizeof(struct network_flow));
+	
+	// bpf_printk("Flow Key: %016" PRIx64 "%016" PRIx64 " ", (uint64_t)(flow_key>>64), (uint64_t)flow_key);	
+	
 	// flow key generator function
 	for(int i = 0; i < NUM_SLICES; ++i){	
+		
 		int offset = murmurhash(flow_key, i) % BITS_PER_SLICE;
 		int hashIndex = i * BITS_PER_SLICE + offset;
+
+		// bpf_printk("hash%d: %d", i, hashIndex);
+		
 		bool bit = true;
 		bpf_map_update_elem(&flow_filter, &hashIndex, &bit, BPF_ANY);
+	
 	}
 
 	return 0;
@@ -71,9 +81,12 @@ bool query_flow_filter(struct network_flow flow, int num_buckets) {
 	memcpy(&flow_key, &flow, sizeof(struct network_flow));
 
 	for( int i = 0; i < num_buckets ; ++i) {
+		
 		int offset = murmurhash(flow_key, i) % BITS_PER_SLICE;
 		int hashIndex = i * BITS_PER_SLICE + offset;
+		
 		bool * set = bpf_map_lookup_elem(&flow_filter, &hashIndex);
+		
 		if(set){
 			if (*set == false) {
 				return false;
@@ -107,7 +120,6 @@ int insert_flow_to_counting_table(struct network_flow flow, bool old_flow) {
 			
 			if(ct){
 				struct counting_table_entry cte = *ct;
-				cte.flowXOR ^= flowKey;
 				cte.packetCount++;
 				bpf_map_update_elem(&counting_table, &bucket_index, &cte, BPF_EXIST);
 			}

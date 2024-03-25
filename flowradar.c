@@ -51,6 +51,17 @@ static void initialize_bloom_filter(int flow_filter_file_descriptor) {
     }
 }
 
+static void initialize_counting_table(int counting_table_file_descriptor) {
+    for(int i = 0 ; i < COUNTING_TABLE_SIZE ; ++i) {
+        struct counting_table_entry cte={
+            .flowXOR = 0,
+            .flowCount = 0,
+            .packetCount = 0
+        };
+        bpf_map_update_elem(counting_table_file_descriptor, &i, &cte, BPF_ANY);
+    }
+}
+
 static void poll_bloom_filter(int flow_filter_file_descriptor, int poll_interval) {
     
     while(1){
@@ -172,6 +183,7 @@ int main(int argc, char *argv[]) {
     int flow_filter_fd = bpf_object__find_map_fd_by_name(bpf_obj, "flow_filter");
     
     initialize_bloom_filter(flow_filter_fd);
+    initialize_counting_table(counting_table_fd);
 
     poll_counting_table(counting_table_fd, 2);
     // poll_bloom_filter(flow_filter_fd, 1);
