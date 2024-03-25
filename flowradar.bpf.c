@@ -102,7 +102,7 @@ insert_flow_to_counting_table(struct network_flow flow, bool old_flow) {
 
       if (ct) {
         struct counting_table_entry cte = *ct;
-        cte.flowXOR ^= flowKey;
+        // cte.flowXOR ^= flowKey;
         cte.packetCount++;
         bpf_map_update_elem(&counting_table, &bucket_index, &cte, BPF_EXIST);
       } else {
