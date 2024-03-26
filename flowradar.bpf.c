@@ -1,4 +1,3 @@
-#include "flowradar.h"
 #include "hashutils.h"
 #include <arpa/inet.h>
 #include <bpf/bpf_helpers.h>
@@ -14,13 +13,13 @@
 #include <stdio.h>
 #include <string.h>
 
-#define BLOOM_FILTER_HASH_COUNT 7
-#define COUNTING_TABLE_HASH_COUNT 4
-#define NUM_SLICES 7
-#define BITS_PER_SLICE 35000
-#define BLOOM_FILTER_SIZE 245000
-#define COUNTING_TABLE_SIZE 30000
-#define BUCKET_SIZE 7500
+// #define BLOOM_FILTER_HASH_COUNT 7
+// #define COUNTING_TABLE_HASH_COUNT 4
+// #define NUM_SLICES 7
+// #define BITS_PER_SLICE 35000
+// #define BLOOM_FILTER_SIZE 245000
+// #define COUNTING_TABLE_SIZE 30000
+// #define BUCKET_SIZE 7500
 
 // Define the Bloom Filter
 // struct {
@@ -50,7 +49,7 @@ static __always_inline int insert_to_flow_filter(struct network_flow flow) {
   __u128 flow_key = 0;
   memcpy(&flow_key, &flow, sizeof(struct network_flow));
   // flow key generator function
-  for (int i = 0; i < NUM_SLICES; ++i) {
+  for (int i = 0; i < FLOW_FILTER_HASH_COUNT; ++i) {
     int offset = murmurhash(flow_key, i) % BITS_PER_SLICE;
     int hashIndex = i * BITS_PER_SLICE + offset;
     bool bit = true;
@@ -207,7 +206,7 @@ int xdp_parse_flow(struct xdp_md *ctx) {
 
   bool old_flow = false;
 
-  if (query_flow_filter(nflow, BLOOM_FILTER_HASH_COUNT)) {
+  if (query_flow_filter(nflow, FLOW_FILTER_HASH_COUNT)) {
     old_flow = true;
   } else {
     insert_to_flow_filter(nflow);

@@ -1,6 +1,5 @@
-#include "flowradar.h"
-#include "counter_decode.h"
-#include "single_decode.h"
+#include "counter_decode.c"
+#include "single_decode.c"
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 #include <inttypes.h>

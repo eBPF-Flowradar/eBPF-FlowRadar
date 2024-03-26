@@ -1,40 +1,45 @@
-#include <linux/types.h>
+#ifndef FLOW_RADAR_H
 
-#ifndef FLOWRADAR_H
-#define FLOWRADAR_H
+#define FLOW_RADAR_H
+
+#include <linux/types.h>
 
 #define BLOOM_FILTER_SIZE 245000
 #define COUNTING_TABLE_SIZE 30000
 #define MAX_PURE_CELLS COUNTING_TABLE_SIZE * 2
-#define NUM_HASH_FUNCTIONS 5
+// #define NUM_HASH_FUNCTIONS 5
+#define FLOW_FILTER_HASH_COUNT 7
+#define COUNTING_TABLE_HASH_COUNT 4
+// #define NUM_SLICES 7
+#define BITS_PER_SLICE 35000
+#define BUCKET_SIZE 7500
 
-struct pureset{
-    __u128 purecells[MAX_PURE_CELLS];
-    int latest_index;
+struct pureset {
+  __u128 purecells[MAX_PURE_CELLS];
+  int latest_index;
 };
 
-struct pureset_packet_count{
-	struct pureset flowset;
-	int pktCount[COUNTING_TABLE_SIZE];
+struct pureset_packet_count {
+  struct pureset flowset;
+  int pktCount[COUNTING_TABLE_SIZE];
 };
 
 struct counting_table_entry {
-	__u128 flowXOR;
-	__u32 flowCount;
-	__u32 packetCount;
+  __u128 flowXOR;
+  __u32 flowCount;
+  __u32 packetCount;
 };
 
-struct flowset
-{
-    struct counting_table_entry counting_table[COUNTING_TABLE_SIZE];
+struct flowset {
+  struct counting_table_entry counting_table[COUNTING_TABLE_SIZE];
 };
 
-struct network_flow{
-	__u32 source_ip;
-	__u32 dest_ip;
-	__u16 source_port;
-	__u16 dest_port;
-	__u8 protocol;
+struct network_flow {
+  __u32 source_ip;
+  __u32 dest_ip;
+  __u16 source_port;
+  __u16 dest_port;
+  __u8 protocol;
 };
 
-#endif
+#endif // !FLOW_RADAR_H
