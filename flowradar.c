@@ -157,13 +157,14 @@ static void print_entry_counting_table(int counting_table_file_descriptor,
 
     loop++;
 
-    // struct pureset_packet_count pspc =
-    //     perform_single_decode(counting_table_file_descriptor);
-    // for (int i = 0; i < pspc.flowset.latest_index; i++) {
-    //   printf("%" PRIx64 "%016" PRIx64 "\n",
-    //          (uint64_t)(pspc.flowset.purecells[i] >> 64),
-    //          (uint64_t)pspc.flowset.purecells[i]);
-    // }
+    printf("PureCells\n");
+    struct pureset_packet_count pspc =
+        perform_single_decode(counting_table_file_descriptor);
+    for (int i = 0; i < pspc.flowset.latest_index; i++) {
+      printf("%" PRIx64 "%016" PRIx64 "\n",
+             (uint64_t)(pspc.flowset.purecells[i] >> 64),
+             (uint64_t)pspc.flowset.purecells[i]);
+    }
     sleep(poll_interval);
   }
 }
