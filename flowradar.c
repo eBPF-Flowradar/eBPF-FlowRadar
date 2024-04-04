@@ -1,7 +1,10 @@
-#include "counter_decode.c"
-#include "single_decode.c"
+#include "counter_decode.h"
+#include "single_decode.h"
+#include "concurrency.h"
+
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
+
 #include <inttypes.h>
 #include <linux/if_link.h>
 #include <net/if.h>
@@ -27,145 +30,232 @@ static void int_exit(int sig) {
 }
 
 static struct pureset_packet_count
-perform_single_decode(int counting_table_file_descriptor) {
+perform_single_decode(int counting_table_file_descriptor, int lock_table_file_descriptor) {
 
-  struct flowset flow_set;
+    struct flowset flow_set;
 
-  for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
-    struct counting_table_entry cte;
-    int ret = bpf_map_lookup_elem(counting_table_file_descriptor, &i, &cte);
-    if (ret == 0) {
-      flow_set.counting_table[i] = cte;
+    for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
+    
+      struct counting_table_entry cte;
+      while(counting_table_is_locked(lock_table_file_descriptor));  
+      int ret = bpf_map_lookup_elem(counting_table_file_descriptor, &i, &cte);
+
+      if (ret == 0) {  
+        flow_set.counting_table[i] = cte;
+      }
     }
-  }
 
-  return single_decode(flow_set);
+    return single_decode(flow_set);
 }
 
-static void initialize_bloom_filter(int flow_filter_file_descriptor) {
+static void perform_counter_decode(int counting_table_file_descriptor, int lock_table_file_descriptor) {
+  
+    struct flowset flow_set;
 
-  for (int i = 0; i < BLOOM_FILTER_SIZE; ++i) {
-    bool set = false;
-    bpf_map_update_elem(flow_filter_file_descriptor, &i, &set, BPF_ANY);
-  }
+
+    for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
+    
+        struct counting_table_entry cte;
+            
+        while(counting_table_is_locked(lock_table_file_descriptor));
+
+        int ret = bpf_map_lookup_elem(counting_table_file_descriptor, &i, &cte);
+
+        if (ret == 0) {
+    
+            flow_set.counting_table[i] = cte;
+    
+        }
+        
+    }
+
+    struct pureset_packet_count pspc = perform_single_decode(counting_table_file_descriptor, lock_table_file_descriptor);
+    
+    CD(flow_set, pspc);
+
 }
 
-static void initialize_counting_table(int counting_table_file_desc) {
+static void initialize_bloom_filter(int flow_filter_file_descriptor, int lock_table_file_descriptor) {
 
-  for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
-    struct counting_table_entry entry = {
-        .flowXOR = 0, .flowCount = 0, .packetCount = 0};
-    bpf_map_update_elem(counting_table_file_desc, &i, &entry, BPF_ANY);
-  }
+      for (int i = 0; i < BLOOM_FILTER_SIZE; ++i) {
+          bool set = false;
+          
+          while(flow_filter_is_locked(lock_table_file_descriptor));
+
+          bpf_map_update_elem(flow_filter_file_descriptor, &i, &set, BPF_ANY);
+      }
+
 }
 
-static void poll_bloom_filter(int flow_filter_file_descriptor,
+static void initialize_counting_table(int counting_table_file_desc, int lock_table_file_desc) {
+        
+      for (int i = 0; i < COUNTING_TABLE_SIZE ; ++i) {
+      
+          struct counting_table_entry entry = {
+              .flowXOR = 0, 
+              .flowCount = 0, 
+              .packetCount = 0
+          };
+
+          while(counting_table_is_locked(lock_table_file_desc));
+          
+          bpf_map_update_elem(counting_table_file_desc, &i, &entry, BPF_ANY);
+
+      }
+
+}
+
+static void poll_bloom_filter(int flow_filter_file_descriptor, int lock_table_file_descriptor,
                               int poll_interval) {
 
-  while (1) {
+    while (1) {
 
-    FILE *fptr;
-    fptr = fopen("bloom_filter_logs.csv", "a");
+        FILE *fptr;
+        fptr = fopen("bloom_filter_logs.csv", "a");
+        
+        for (int i = 0; i < BLOOM_FILTER_SIZE; ++i) {
+            
+            bool set_bit = false;
+        
+            while(flow_filter_is_locked(lock_table_file_descriptor));
 
-    for (int i = 0; i < BLOOM_FILTER_SIZE; ++i) {
-      bool set_bit = false;
-      bpf_map_lookup_elem(flow_filter_file_descriptor, &i, &set_bit);
-      if (i == BLOOM_FILTER_SIZE - 1) {
-        fprintf(fptr, "%d\n", set_bit);
-      } else {
-        fprintf(fptr, "%d, ", set_bit);
-      }
+            bpf_map_lookup_elem(flow_filter_file_descriptor, &i, &set_bit);
+            
+            if (i == BLOOM_FILTER_SIZE - 1) {
+                fprintf(fptr, "%d\n", set_bit);
+            } 
+            else {
+                fprintf(fptr, "%d, ", set_bit);
+            }
+            
+        }
+
+        fclose(fptr);
+
+        sleep(poll_interval);
+
     }
-
-    fclose(fptr);
-
-    sleep(poll_interval);
-  }
 }
 
-static void poll_counting_table(int counting_table_file_descriptor,
+static void poll_counting_table(int counting_table_file_descriptor, int lock_table_file_descriptor,
                                 int poll_interval) {
-
   while (1) {
 
-    FILE *fptr;
-    fptr = fopen("counting_table_logs.csv", "a");
-
-    for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
-      struct counting_table_entry cte;
-      bpf_map_lookup_elem(counting_table_file_descriptor, &i, &cte);
-      flow_key_buff[i] = cte.flowXOR;
-      flow_count_buff[i] = cte.flowCount;
-      packet_count_buff[i] = cte.packetCount;
-    }
-
-    for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
-      if (i == COUNTING_TABLE_SIZE - 1) {
-        fprintf(fptr, "%lf\n", (float)flow_key_buff[i]);
-      } else if (i == 0) {
-        fprintf(fptr, "FlowXOR, %lf, ", (float)flow_key_buff[i]);
-      } else {
-        fprintf(fptr, "%lf, ", (float)flow_key_buff[i]);
+      FILE *fptr;
+      fptr = fopen("counting_table_logs.csv", "a");
+      
+      for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
+        
+          struct counting_table_entry cte;
+    
+          while(counting_table_is_locked(lock_table_file_descriptor));
+    
+          bpf_map_lookup_elem(counting_table_file_descriptor, &i, &cte);
+    
+          flow_key_buff[i] = cte.flowXOR;
+          flow_count_buff[i] = cte.flowCount;
+          packet_count_buff[i] = cte.packetCount;
+      
       }
-    }
 
-    for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
-      if (i == COUNTING_TABLE_SIZE - 1) {
-        fprintf(fptr, "%d\n", flow_count_buff[i]);
-      } else if (i == 0) {
-        fprintf(fptr, "FlowCount, %d, ", flow_count_buff[i]);
-      } else {
-        fprintf(fptr, "%d, ", flow_count_buff[i]);
-      }
-    }
+      char str[32];
+          
+      for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
 
-    for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
-      if (i == COUNTING_TABLE_SIZE - 1) {
-        fprintf(fptr, "%d\n", packet_count_buff[i]);
-      } else if (i == 0) {
-        fprintf(fptr, "PacketCount, %d, ", packet_count_buff[i]);
-      } else {
-        fprintf(fptr, "%d, ", packet_count_buff[i]);
+          memset(str, '\0', sizeof(str));
+          sprintf(str, "%" PRIx64 "%016" PRIx64, (uint64_t)(flow_key_buff[i]>> 64), (uint64_t)flow_key_buff[i]);
+
+          if (i == COUNTING_TABLE_SIZE - 1) {
+          
+            fprintf(fptr, "%s\n", str);
+          
+          } else if (i == 0) {
+          
+            fprintf(fptr, "FlowXOR, %s, ", str);
+          
+          } else {
+          
+            fprintf(fptr, "%s, ", str);
+          
+          }
+
       }
-    }
-    fclose(fptr);
-    sleep(poll_interval);
+
+      for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
+        
+        if (i == COUNTING_TABLE_SIZE - 1) {
+          fprintf(fptr, "%d\n", flow_count_buff[i]);
+        } 
+        else if (i == 0) {
+          fprintf(fptr, "FlowCount, %d, ", flow_count_buff[i]);
+        } 
+        else {
+          fprintf(fptr, "%d, ", flow_count_buff[i]);
+        }
+
+      }
+
+      for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
+          if (i == COUNTING_TABLE_SIZE - 1) {
+            fprintf(fptr, "%d\n", packet_count_buff[i]);
+          } 
+          else if (i == 0) {
+            fprintf(fptr, "PacketCount, %d, ", packet_count_buff[i]);
+          } 
+          else {
+            fprintf(fptr, "%d, ", packet_count_buff[i]);
+          }
+      }
+
+      fclose(fptr);
+      sleep(poll_interval);
   }
 }
 
-static void print_entry_counting_table(int counting_table_file_descriptor,
+static void print_entry_counting_table(int counting_table_file_descriptor, int lock_table_file_descriptor,
                                        int poll_interval) {
 
   int loop = 0;
 
   while (1) {
 
-    printf("Poll No : %d\n", loop);
-    printf("FlowXOR ,FlowCount ,PacketCount\n");
+      printf("Poll No : %d\n", loop);
+      printf("FlowXOR ,FlowCount ,PacketCount\n");
 
-    for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
-      struct counting_table_entry cte;
-      bpf_map_lookup_elem(counting_table_file_descriptor, &i, &cte);
-      if (cte.flowXOR) {
-        printf("%" PRIx64 "%016" PRIx64, (uint64_t)(cte.flowXOR >> 64),
-               (uint64_t)cte.flowXOR);
-        printf(" ,%d ,%d\n", cte.flowCount, cte.packetCount);
-        // printf("%x ,%d ,%d\n", cte.flowXOR, cte.flowCount, cte.packetCount);
+      for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
+
+          struct counting_table_entry cte;
+
+          while(counting_table_is_locked(lock_table_file_descriptor));
+          
+          bpf_map_lookup_elem(counting_table_file_descriptor, &i, &cte);
+          
+          if (cte.flowXOR) {
+    
+              printf("%" PRIx64 "%016" PRIx64, (uint64_t)(cte.flowXOR >> 64),
+                    (uint64_t)cte.flowXOR);
+            
+              printf(" , %d, %d\n", cte.flowCount, cte.packetCount);
+              // printf("%x ,%d ,%d\n", cte.flowXOR, cte.flowCount, cte.packetCount);
+          }
+      
       }
-    }
 
-    loop++;
+      loop++;
 
-    printf("PureCells\n");
-    struct pureset_packet_count pspc =
-        perform_single_decode(counting_table_file_descriptor);
-    for (int i = 0; i < pspc.flowset.latest_index; i++) {
-      printf("%" PRIx64 "%016" PRIx64 "\n",
-             (uint64_t)(pspc.flowset.purecells[i] >> 64),
-             (uint64_t)pspc.flowset.purecells[i]);
-    }
-    sleep(poll_interval);
+      printf("PureCells\n");
+      struct pureset_packet_count pspc = perform_single_decode(counting_table_file_descriptor, lock_table_file_descriptor);
+
+      for (int i = 0; i < pspc.flowset.latest_index; i++) {
+        printf("%" PRIx64 "%016" PRIx64 "\n",
+              (uint64_t)(pspc.flowset.purecells[i] >> 64),
+              (uint64_t)pspc.flowset.purecells[i]);
+      }
+
+      sleep(poll_interval);
+    
   }
+
 }
 
 int main(int argc, char *argv[]) {
@@ -210,17 +300,26 @@ int main(int argc, char *argv[]) {
 
   bpf_obj = xdp_program__bpf_obj(prog);
 
-  int counting_table_fd =
-      bpf_object__find_map_fd_by_name(bpf_obj, "counting_table");
+  int counting_table_fd = bpf_object__find_map_fd_by_name(bpf_obj, "counting_table");
   int flow_filter_fd = bpf_object__find_map_fd_by_name(bpf_obj, "flow_filter");
+  int lock_table_fd= bpf_object__find_map_fd_by_name(bpf_obj, "lock_table");
 
-  initialize_bloom_filter(flow_filter_fd);
-  initialize_counting_table(counting_table_fd);
+  initialize_bloom_filter(flow_filter_fd, lock_table_fd);
+  initialize_counting_table(counting_table_fd, lock_table_fd);
 
   // poll_counting_table(counting_table_fd, 2);
-  //  poll_bloom_filter(flow_filter_fd, 1);
-  print_entry_counting_table(counting_table_fd, 2);
-
+  // poll_bloom_filter(flow_filter_fd, 1);
+  // print_entry_counting_table(counting_table_fd, 2);
+  sleep(30);
+   
+  while (true)
+  {
+    perform_counter_decode(counting_table_fd,lock_table_fd);
+    sleep(30);
+    /* code */
+  }
+  
+  
   int_exit(0);
   return 0;
 }
