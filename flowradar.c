@@ -59,79 +59,79 @@ static void initialize_counting_table(int counting_table_file_desc) {
   }
 }
 
-static void poll_bloom_filter(int flow_filter_file_descriptor,
-                              int poll_interval) {
+// static void poll_bloom_filter(int flow_filter_file_descriptor,
+//                               int poll_interval) {
 
-  while (1) {
+//   while (1) {
 
-    FILE *fptr;
-    fptr = fopen("bloom_filter_logs.csv", "a");
+//     FILE *fptr;
+//     fptr = fopen("bloom_filter_logs.csv", "a");
 
-    for (int i = 0; i < BLOOM_FILTER_SIZE; ++i) {
-      bool set_bit = false;
-      bpf_map_lookup_elem(flow_filter_file_descriptor, &i, &set_bit);
-      if (i == BLOOM_FILTER_SIZE - 1) {
-        fprintf(fptr, "%d\n", set_bit);
-      } else {
-        fprintf(fptr, "%d, ", set_bit);
-      }
-    }
+//     for (int i = 0; i < BLOOM_FILTER_SIZE; ++i) {
+//       bool set_bit = false;
+//       bpf_map_lookup_elem(flow_filter_file_descriptor, &i, &set_bit);
+//       if (i == BLOOM_FILTER_SIZE - 1) {
+//         fprintf(fptr, "%d\n", set_bit);
+//       } else {
+//         fprintf(fptr, "%d, ", set_bit);
+//       }
+//     }
 
-    fclose(fptr);
+//     fclose(fptr);
 
-    sleep(poll_interval);
-  }
-}
+//     sleep(poll_interval);
+//   }
+// }
 
-static void poll_counting_table(int counting_table_file_descriptor,
-                                int poll_interval) {
+// static void poll_counting_table(int counting_table_file_descriptor,
+//                                 int poll_interval) {
 
-  while (1) {
+//   while (1) {
 
-    FILE *fptr;
-    fptr = fopen("counting_table_logs.csv", "a");
+//     FILE *fptr;
+//     fptr = fopen("counting_table_logs.csv", "a");
 
-    for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
-      struct counting_table_entry cte;
-      bpf_map_lookup_elem(counting_table_file_descriptor, &i, &cte);
-      flow_key_buff[i] = cte.flowXOR;
-      flow_count_buff[i] = cte.flowCount;
-      packet_count_buff[i] = cte.packetCount;
-    }
+//     for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
+//       struct counting_table_entry cte;
+//       bpf_map_lookup_elem(counting_table_file_descriptor, &i, &cte);
+//       flow_key_buff[i] = cte.flowXOR;
+//       flow_count_buff[i] = cte.flowCount;
+//       packet_count_buff[i] = cte.packetCount;
+//     }
 
-    for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
-      if (i == COUNTING_TABLE_SIZE - 1) {
-        fprintf(fptr, "%lf\n", (float)flow_key_buff[i]);
-      } else if (i == 0) {
-        fprintf(fptr, "FlowXOR, %lf, ", (float)flow_key_buff[i]);
-      } else {
-        fprintf(fptr, "%lf, ", (float)flow_key_buff[i]);
-      }
-    }
+//     for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
+//       if (i == COUNTING_TABLE_SIZE - 1) {
+//         fprintf(fptr, "%lf\n", (float)flow_key_buff[i]);
+//       } else if (i == 0) {
+//         fprintf(fptr, "FlowXOR, %lf, ", (float)flow_key_buff[i]);
+//       } else {
+//         fprintf(fptr, "%lf, ", (float)flow_key_buff[i]);
+//       }
+//     }
 
-    for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
-      if (i == COUNTING_TABLE_SIZE - 1) {
-        fprintf(fptr, "%d\n", flow_count_buff[i]);
-      } else if (i == 0) {
-        fprintf(fptr, "FlowCount, %d, ", flow_count_buff[i]);
-      } else {
-        fprintf(fptr, "%d, ", flow_count_buff[i]);
-      }
-    }
+//     for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
+//       if (i == COUNTING_TABLE_SIZE - 1) {
+//         fprintf(fptr, "%d\n", flow_count_buff[i]);
+//       } else if (i == 0) {
+//         fprintf(fptr, "FlowCount, %d, ", flow_count_buff[i]);
+//       } else {
+//         fprintf(fptr, "%d, ", flow_count_buff[i]);
+//       }
+//     }
 
-    for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
-      if (i == COUNTING_TABLE_SIZE - 1) {
-        fprintf(fptr, "%d\n", packet_count_buff[i]);
-      } else if (i == 0) {
-        fprintf(fptr, "PacketCount, %d, ", packet_count_buff[i]);
-      } else {
-        fprintf(fptr, "%d, ", packet_count_buff[i]);
-      }
-    }
-    fclose(fptr);
-    sleep(poll_interval);
-  }
-}
+//     for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
+//       if (i == COUNTING_TABLE_SIZE - 1) {
+//         fprintf(fptr, "%d\n", packet_count_buff[i]);
+//       } else if (i == 0) {
+//         fprintf(fptr, "PacketCount, %d, ", packet_count_buff[i]);
+//       } else {
+//         fprintf(fptr, "%d, ", packet_count_buff[i]);
+//       }
+//     }
+//     fclose(fptr);
+//     sleep(poll_interval);
+//   }
+// }
 
 static void print_entry_counting_table(int counting_table_file_descriptor,
                                        int poll_interval) {
