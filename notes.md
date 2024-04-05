@@ -12,6 +12,7 @@
 4. Verify lsqr solver(partially verified)
 5. Standard values to be used 
 6. Concurrency controls
+7. murmur hash implementations
 
 # Things done
 1. Pureset need not be a set as the flows added will be unique always [x]
