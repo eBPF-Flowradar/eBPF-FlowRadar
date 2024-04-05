@@ -46,7 +46,7 @@ static void initialize_counting_table(int counting_table_file_desc) {
 
 
 
-static void start_decode(int counting_table_file_descriptor,
+static void start_decode(int counting_table_file_descriptor,int flow_filter_file_descriptor,
                                        int poll_interval) {
 
   int loop = 0;
@@ -77,7 +77,11 @@ static void start_decode(int counting_table_file_descriptor,
       }
     }
 
-    //empty the the flowset?    
+
+    //reset the flowset
+    initialize_bloom_filter(flow_filter_file_descriptor);
+    initialize_counting_table(counting_table_file_descriptor);
+
 
     //perform single decode and print the purecells
     struct pureset pure_set;
@@ -155,7 +159,7 @@ int main(int argc, char *argv[]) {
   initialize_bloom_filter(flow_filter_fd);
   initialize_counting_table(counting_table_fd);
 
-  start_decode(counting_table_fd, 2);
+  start_decode(counting_table_fd,flow_filter_fd,5);
 
   int_exit(0);
   return 0;
