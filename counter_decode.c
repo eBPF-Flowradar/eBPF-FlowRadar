@@ -3,6 +3,7 @@
 #include <gsl/gsl_multifit.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <inttypes.h>
 
 gsl_matrix *array_matrix_convert(double **eq_matrix, int num_purecells) {
 
@@ -94,7 +95,7 @@ double *method_lsq(double **eq_matrix, double *pktcount_mtrx,
   return sol_array;
 }
 
-int CD(struct flowset A, struct pureset pure_set, __u32 pktCount[COUNTING_TABLE_SIZE]) {
+int counter_decode(struct flowset A, struct pureset pure_set, __u32 pktCount[COUNTING_TABLE_SIZE]) {
   /*
       To run CounterDecode on the flowlist. The target is to solve Ax = B where
      B -> Packet counts and A is a binary matrix
@@ -107,7 +108,7 @@ int CD(struct flowset A, struct pureset pure_set, __u32 pktCount[COUNTING_TABLE_
   double *pktcount_matrix =
       (double *)malloc(COUNTING_TABLE_SIZE * sizeof(double));
 
-  for (int i = 0; i < 30000; ++i) {
+  for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
 
     pktcount_matrix[i] = pktCount[i];
   }
@@ -123,7 +124,7 @@ int CD(struct flowset A, struct pureset pure_set, __u32 pktCount[COUNTING_TABLE_
 
     for (int num_hash = 0; num_hash < COUNTING_TABLE_HASH_COUNT; num_hash++) {
 
-      int entry_pos = jhash_key(flow_id, num_hash);
+      int entry_pos = jhash_key(flow_id, num_hash)%COUNTING_TABLE_SIZE;
 
       eq_matrix[entry_pos][j] = 1.0;
     }
@@ -132,9 +133,18 @@ int CD(struct flowset A, struct pureset pure_set, __u32 pktCount[COUNTING_TABLE_
   double *sol_array = method_lsq(eq_matrix, pktcount_matrix, num_purecells);
 
   for (int i = 0; i < num_purecells; i++) {
-
-    printf("Purecell:%d | Packet_count:%f", i, sol_array[i]);
+      printf("Purecell: ");
+      printf("%" PRIx64 "%016" PRIx64,
+             (uint64_t)(pure_set.purecells[i] >> 64),
+             (uint64_t)pure_set.purecells[i]);
+    printf(" | Packet_count:%f\n", sol_array[i]);
   }
 
+  //free all memory
+  for (int i = 0; i < COUNTING_TABLE_SIZE; i++) {
+    free(eq_matrix[i]);
+  }
   free(eq_matrix);
+  free(pktcount_matrix);
+  free(sol_array);
 }

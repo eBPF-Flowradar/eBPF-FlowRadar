@@ -77,7 +77,7 @@ static void start_decode(int counting_table_file_descriptor,
       }
     }
 
-    
+    //empty the the flowset?    
 
     //perform single decode and print the purecells
     struct pureset pure_set =
@@ -91,6 +91,7 @@ static void start_decode(int counting_table_file_descriptor,
     
     
     //perform counter decode
+    counter_decode(flow_set,pure_set,pktCount);
 
 
     
