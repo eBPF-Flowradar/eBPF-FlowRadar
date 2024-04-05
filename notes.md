@@ -10,3 +10,7 @@
 2. Check if memory allocated is deallocated
 3. Check consistency of hashing
 4. Verify lsqr solver(partially verified)
+
+# Things done
+1. Pureset need not be a set as the flows added will be unique always [x]
+2. Change implementation of single decode to perform it until no pure cells exist [x]

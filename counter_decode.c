@@ -95,7 +95,7 @@ double *method_lsq(double **eq_matrix, double *pktcount_mtrx,
   return sol_array;
 }
 
-int counter_decode(struct flowset A, struct pureset pure_set, __u32 pktCount[COUNTING_TABLE_SIZE]) {
+int counter_decode(struct pureset pure_set, __u32 pktCount[COUNTING_TABLE_SIZE]) {
   /*
       To run CounterDecode on the flowlist. The target is to solve Ax = B where
      B -> Packet counts and A is a binary matrix
@@ -131,7 +131,7 @@ int counter_decode(struct flowset A, struct pureset pure_set, __u32 pktCount[COU
   }
 
   double *sol_array = method_lsq(eq_matrix, pktcount_matrix, num_purecells);
-
+  printf("\nCounter Decode complete...\n");
   for (int i = 0; i < num_purecells; i++) {
       printf("Purecell: ");
       printf("%" PRIx64 "%016" PRIx64,

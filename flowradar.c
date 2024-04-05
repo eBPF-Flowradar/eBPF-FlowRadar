@@ -80,9 +80,15 @@ static void start_decode(int counting_table_file_descriptor,
     //empty the the flowset?    
 
     //perform single decode and print the purecells
-    struct pureset pure_set =
-        single_decode(flow_set);
-    printf("PureCells\n");
+    struct pureset pure_set;
+    pure_set.latest_index=0;
+    while(check_purecells(&flow_set)){
+
+      single_decode(&flow_set,&pure_set);
+
+    }
+
+    printf("\nSingle Decode Complete.....\nPureCells\n");
     for (int i = 0; i < pure_set.latest_index; i++) {
       printf("%" PRIx64 "%016" PRIx64 "\n",
              (uint64_t)(pure_set.purecells[i] >> 64),
@@ -91,7 +97,8 @@ static void start_decode(int counting_table_file_descriptor,
     
     
     //perform counter decode
-    counter_decode(flow_set,pure_set,pktCount);
+    counter_decode(pure_set,pktCount);
+    // counter_decode(flow_set,pure_set,pktCount);
 
 
     
