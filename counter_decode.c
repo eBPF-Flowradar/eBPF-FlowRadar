@@ -94,7 +94,7 @@ double *method_lsq(double **eq_matrix, double *pktcount_mtrx,
   return sol_array;
 }
 
-int CD(struct flowset A, struct pureset_packet_count flowset_pktcount) {
+int CD(struct flowset A, struct pureset pure_set, __u32 pktCount[COUNTING_TABLE_SIZE]) {
   /*
       To run CounterDecode on the flowlist. The target is to solve Ax = B where
      B -> Packet counts and A is a binary matrix
@@ -102,14 +102,14 @@ int CD(struct flowset A, struct pureset_packet_count flowset_pktcount) {
 
   double **eq_matrix = (double **)calloc(COUNTING_TABLE_SIZE, sizeof(double *));
 
-  int num_purecells = flowset_pktcount.flowset.latest_index;
+  int num_purecells = pure_set.latest_index;
 
   double *pktcount_matrix =
       (double *)malloc(COUNTING_TABLE_SIZE * sizeof(double));
 
   for (int i = 0; i < 30000; ++i) {
 
-    pktcount_matrix[i] = flowset_pktcount.pktCount[i];
+    pktcount_matrix[i] = pktCount[i];
   }
 
   for (int i = 0; i < COUNTING_TABLE_SIZE; i++) {
@@ -119,7 +119,7 @@ int CD(struct flowset A, struct pureset_packet_count flowset_pktcount) {
 
   for (int j = 0; j < num_purecells; j++) {
 
-    __u128 flow_id = flowset_pktcount.flowset.purecells[j];
+    __u128 flow_id = pure_set.purecells[j];
 
     for (int num_hash = 0; num_hash < COUNTING_TABLE_HASH_COUNT; num_hash++) {
 

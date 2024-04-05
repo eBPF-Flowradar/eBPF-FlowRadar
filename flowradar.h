@@ -19,10 +19,10 @@ struct pureset {
   int latest_index;
 };
 
-struct pureset_packet_count {
-  struct pureset flowset;
-  int pktCount[COUNTING_TABLE_SIZE];
-};
+// struct pureset_packet_count {
+//   struct pureset set;
+//   int pktCount[COUNTING_TABLE_SIZE];
+// };
 
 struct counting_table_entry {
   __u128 flowXOR;

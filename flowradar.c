@@ -16,9 +16,9 @@
 static int ifindex;
 struct xdp_program *prog = NULL;
 
-__u128 flow_key_buff[COUNTING_TABLE_SIZE];
-__u32 flow_count_buff[COUNTING_TABLE_SIZE];
-__u32 packet_count_buff[COUNTING_TABLE_SIZE];
+// __u128 flow_key_buff[COUNTING_TABLE_SIZE];
+// __u32 flow_count_buff[COUNTING_TABLE_SIZE];
+// __u32 packet_count_buff[COUNTING_TABLE_SIZE];
 
 static void int_exit(int sig) {
   xdp_program__detach(prog, ifindex, XDP_MODE_SKB, 0);
@@ -26,21 +26,6 @@ static void int_exit(int sig) {
   exit(0);
 }
 
-static struct pureset_packet_count
-perform_single_decode(int counting_table_file_descriptor) {
-
-  struct flowset flow_set;
-
-  for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
-    struct counting_table_entry cte;
-    int ret = bpf_map_lookup_elem(counting_table_file_descriptor, &i, &cte);
-    if (ret == 0) {
-      flow_set.counting_table[i] = cte;
-    }
-  }
-
-  return single_decode(flow_set);
-}
 
 static void initialize_bloom_filter(int flow_filter_file_descriptor) {
 
@@ -59,112 +44,57 @@ static void initialize_counting_table(int counting_table_file_desc) {
   }
 }
 
-// static void poll_bloom_filter(int flow_filter_file_descriptor,
-//                               int poll_interval) {
 
-//   while (1) {
 
-//     FILE *fptr;
-//     fptr = fopen("bloom_filter_logs.csv", "a");
-
-//     for (int i = 0; i < BLOOM_FILTER_SIZE; ++i) {
-//       bool set_bit = false;
-//       bpf_map_lookup_elem(flow_filter_file_descriptor, &i, &set_bit);
-//       if (i == BLOOM_FILTER_SIZE - 1) {
-//         fprintf(fptr, "%d\n", set_bit);
-//       } else {
-//         fprintf(fptr, "%d, ", set_bit);
-//       }
-//     }
-
-//     fclose(fptr);
-
-//     sleep(poll_interval);
-//   }
-// }
-
-// static void poll_counting_table(int counting_table_file_descriptor,
-//                                 int poll_interval) {
-
-//   while (1) {
-
-//     FILE *fptr;
-//     fptr = fopen("counting_table_logs.csv", "a");
-
-//     for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
-//       struct counting_table_entry cte;
-//       bpf_map_lookup_elem(counting_table_file_descriptor, &i, &cte);
-//       flow_key_buff[i] = cte.flowXOR;
-//       flow_count_buff[i] = cte.flowCount;
-//       packet_count_buff[i] = cte.packetCount;
-//     }
-
-//     for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
-//       if (i == COUNTING_TABLE_SIZE - 1) {
-//         fprintf(fptr, "%lf\n", (float)flow_key_buff[i]);
-//       } else if (i == 0) {
-//         fprintf(fptr, "FlowXOR, %lf, ", (float)flow_key_buff[i]);
-//       } else {
-//         fprintf(fptr, "%lf, ", (float)flow_key_buff[i]);
-//       }
-//     }
-
-//     for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
-//       if (i == COUNTING_TABLE_SIZE - 1) {
-//         fprintf(fptr, "%d\n", flow_count_buff[i]);
-//       } else if (i == 0) {
-//         fprintf(fptr, "FlowCount, %d, ", flow_count_buff[i]);
-//       } else {
-//         fprintf(fptr, "%d, ", flow_count_buff[i]);
-//       }
-//     }
-
-//     for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
-//       if (i == COUNTING_TABLE_SIZE - 1) {
-//         fprintf(fptr, "%d\n", packet_count_buff[i]);
-//       } else if (i == 0) {
-//         fprintf(fptr, "PacketCount, %d, ", packet_count_buff[i]);
-//       } else {
-//         fprintf(fptr, "%d, ", packet_count_buff[i]);
-//       }
-//     }
-//     fclose(fptr);
-//     sleep(poll_interval);
-//   }
-// }
-
-static void print_entry_counting_table(int counting_table_file_descriptor,
+static void start_decode(int counting_table_file_descriptor,
                                        int poll_interval) {
 
   int loop = 0;
 
   while (1) {
 
+    loop++;
     printf("Poll No : %d\n", loop);
     printf("FlowXOR ,FlowCount ,PacketCount\n");
 
+    struct flowset flow_set;
+    __u32 pktCount[COUNTING_TABLE_SIZE];
+
+    //TODO: check for more efficient ways of copying maps to userspace
+    //TODO: Concurrency control
     for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
       struct counting_table_entry cte;
-      bpf_map_lookup_elem(counting_table_file_descriptor, &i, &cte);
+      int ret = bpf_map_lookup_elem(counting_table_file_descriptor, &i, &cte);
+      if (ret == 0) {
+        flow_set.counting_table[i] = cte;
+        pktCount[i]=cte.packetCount;
+      }
       if (cte.flowXOR) {
         printf("%" PRIx64 "%016" PRIx64, (uint64_t)(cte.flowXOR >> 64),
-               (uint64_t)cte.flowXOR);
+              (uint64_t)cte.flowXOR);
         printf(" ,%d ,%d\n", cte.flowCount, cte.packetCount);
-        // printf("%x ,%d ,%d\n", cte.flowXOR, cte.flowCount, cte.packetCount);
+      // printf("%x ,%d ,%d\n", cte.flowXOR, cte.flowCount, cte.packetCount);
       }
     }
 
-    loop++;
+    
 
+    //perform single decode and print the purecells
+    struct pureset pure_set =
+        single_decode(flow_set);
     printf("PureCells\n");
-    struct pureset_packet_count pspc =
-        perform_single_decode(counting_table_file_descriptor);
-    for (int i = 0; i < pspc.flowset.latest_index; i++) {
+    for (int i = 0; i < pure_set.latest_index; i++) {
       printf("%" PRIx64 "%016" PRIx64 "\n",
-             (uint64_t)(pspc.flowset.purecells[i] >> 64),
-             (uint64_t)pspc.flowset.purecells[i]);
+             (uint64_t)(pure_set.purecells[i] >> 64),
+             (uint64_t)pure_set.purecells[i]);
     }
-    sleep(poll_interval);
+    
+    
+    //perform counter decode
+
+
+    
+    sleep(poll_interval);   
   }
 }
 
@@ -172,7 +102,7 @@ int main(int argc, char *argv[]) {
 
   int prog_fd, map_fd, ret;
   struct bpf_object *bpf_obj;
-  struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
+  // struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
 
   //// IS THIS NECESSARY
   // if (setrlimit(RLIMIT_MEMLOCK, &r)) {
@@ -217,9 +147,7 @@ int main(int argc, char *argv[]) {
   initialize_bloom_filter(flow_filter_fd);
   initialize_counting_table(counting_table_fd);
 
-  // poll_counting_table(counting_table_fd, 2);
-  //  poll_bloom_filter(flow_filter_fd, 1);
-  print_entry_counting_table(counting_table_fd, 2);
+  start_decode(counting_table_fd, 2);
 
   int_exit(0);
   return 0;

@@ -14,19 +14,19 @@ int add(struct pureset *flowSet, __u128 flowXOR) {
   return 1;
 }
 
-struct pureset_packet_count single_decode(struct flowset A) {
+struct pureset single_decode(struct flowset A) {
 
-  struct pureset_packet_count flowset_pktcount;
-  flowset_pktcount.flowset.latest_index = 0;
+  struct pureset pure_set;
+  pure_set.latest_index = 0;
 
   for (int c = 0; c < COUNTING_TABLE_SIZE; ++c) {
 
     struct counting_table_entry ct_entry = A.counting_table[c];
-    flowset_pktcount.pktCount[c] = A.counting_table[c].packetCount;
+    // flowset_pktcount.pktCount[c] = A.counting_table[c].packetCount;
 
     if (ct_entry.flowCount == 1) {
       __u128 flowXOR = ct_entry.flowXOR;
-      int ispresent = add(&(flowset_pktcount.flowset), flowXOR);
+      int ispresent = add(&(pure_set), flowXOR);
       int packetCount = ct_entry.packetCount;
 
       for (int num_hash = 0; num_hash < COUNTING_TABLE_HASH_COUNT; ++num_hash) {
@@ -40,5 +40,5 @@ struct pureset_packet_count single_decode(struct flowset A) {
     }
   }
 
-  return flowset_pktcount;
+  return pure_set;
 }
