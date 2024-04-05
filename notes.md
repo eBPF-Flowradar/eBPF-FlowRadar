@@ -13,6 +13,7 @@
 5. Standard values to be used 
 6. Concurrency controls
 7. murmur hash implementations
+8. make time to 280ms
 
 # Things done
 1. Pureset need not be a set as the flows added will be unique always [x]
