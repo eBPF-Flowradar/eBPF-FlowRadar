@@ -78,7 +78,8 @@ static void start_decode(int counting_table_file_descriptor,int flow_filter_file
     }
 
 
-    //reset the flowset
+    //reset the flowset 
+    //TODO : better way to do this?
     initialize_bloom_filter(flow_filter_file_descriptor);
     initialize_counting_table(counting_table_file_descriptor);
 

@@ -12,7 +12,7 @@
 #define COUNTING_TABLE_HASH_COUNT 4
 // #define NUM_SLICES 7
 #define BITS_PER_SLICE 35000
-#define BUCKET_SIZE 7500
+// #define BUCKET_SIZE 7500
 
 struct pureset {
   __u128 purecells[MAX_PURE_CELLS];
