@@ -36,20 +36,46 @@
 
 #define MAX_LOCKS 2
 
+#define X 0
+#define Y 1
+
+#define PROG_START_TIME_INDEX 0
+#define FLOWSET_ID_INDEX 0
+
+struct {
+  __uint(type, BPF_MAP_TYPE_ARRAY);
+  __type(key, int);
+  __type(value, __u32);
+  __uint(max_entries, 1);
+} flowsetID SEC(".maps");
 
 struct {
   __uint(type, BPF_MAP_TYPE_ARRAY);
   __type(key, int);
   __type(value, struct counting_table_entry);
   __uint(max_entries, COUNTING_TABLE_SIZE);
-} counting_table SEC(".maps");
+} counting_table_X SEC(".maps");
 
 struct {
   __uint(type, BPF_MAP_TYPE_ARRAY);
   __type(key, int);
   __type(value, bool);
   __uint(max_entries, BLOOM_FILTER_SIZE);
-} flow_filter SEC(".maps");
+} flow_filter_X SEC(".maps");
+
+struct {
+  __uint(type, BPF_MAP_TYPE_ARRAY);
+  __type(key, int);
+  __type(value, struct counting_table_entry);
+  __uint(max_entries, COUNTING_TABLE_SIZE);
+} counting_table_Y SEC(".maps");
+
+struct {
+  __uint(type, BPF_MAP_TYPE_ARRAY);
+  __type(key, int);
+  __type(value, bool);
+  __uint(max_entries, BLOOM_FILTER_SIZE);
+} flow_filter_Y SEC(".maps");
 
 
 struct {
@@ -61,55 +87,8 @@ struct {
 
 // Implementing User to Kernel Locks using eBPF MAPS
 
-static __always_inline void initalize_counting_table_locks() {
-      
-      int j = COUNTING_TABLE_LOCK_INDEX;
-      __u32 value = 0;
-      
-      bpf_map_update_elem(&lock_table, &j, &value, BPF_ANY);
-}
 
-static __always_inline void initalize_flow_filter_locks() {
-      
-      int j = FLOW_FILTER_LOCK_INDEX;
-      __u32 value = 0;
-
-      bpf_map_update_elem(&lock_table, &j, &value, BPF_ANY);
-}
-
-static __always_inline void lock_counting_table() {
-      
-      int j = COUNTING_TABLE_LOCK_INDEX;
-      __u32 value = 1;
-
-      bpf_map_update_elem(&lock_table, &j, &value, BPF_ANY);
-}
-
-static __always_inline void unlock_counting_table() {
-
-      int j = COUNTING_TABLE_LOCK_INDEX;
-      __u32 value = 0;
-
-      bpf_map_update_elem(&lock_table, &j, &value, BPF_ANY);
-}
-
-static __always_inline void lock_flow_filter() {
-
-      int j = FLOW_FILTER_LOCK_INDEX;
-      __u32 value = 1;
-
-      bpf_map_update_elem(&lock_table, &j, &value, BPF_ANY);
-}
-
-static __always_inline void unlock_flow_filter() {
-
-      int j = FLOW_FILTER_LOCK_INDEX;
-      __u32 value = 0;
-
-      bpf_map_update_elem(&lock_table, &j, &value, BPF_ANY); 
-}
-
-static __always_inline int insert_to_flow_filter(struct network_flow flow) {
+static __always_inline int insert_to_flow_filter(struct network_flow flow, int countingTableID) {
 
   
       __u128 flow_key = 0;
@@ -117,9 +96,7 @@ static __always_inline int insert_to_flow_filter(struct network_flow flow) {
       memcpy(&flow_key, &flow, sizeof(struct network_flow));
       
       // flow key generator function
-      initalize_flow_filter_locks();
 
-      lock_flow_filter();
       for (int i = 0; i < FLOW_FILTER_HASH_COUNT; ++i) {
       
         int offset = murmurhash(flow_key, i) % BITS_PER_SLICE;
@@ -127,18 +104,18 @@ static __always_inline int insert_to_flow_filter(struct network_flow flow) {
         int hashIndex = i * BITS_PER_SLICE + offset;
       
         bool bit = true;
-      
-        bpf_map_update_elem(&flow_filter, &hashIndex, &bit, BPF_ANY);
+        if(countingTableID == 0)
+            bpf_map_update_elem(&flow_filter_X, &hashIndex, &bit, BPF_ANY);
+        else if(countingTableID == 1)  
+            bpf_map_update_elem(&flow_filter_Y, &hashIndex, &bit, BPF_ANY);
       
       }
-
-      unlock_flow_filter();
 
       return 0;
 }
     
 static __always_inline bool query_flow_filter(struct network_flow flow,
-                                              int num_buckets) {
+                                              int num_buckets, int flowfilterID) {
       __u128 flow_key = 0;
       
       memcpy(&flow_key, &flow, sizeof(struct network_flow));
@@ -147,9 +124,16 @@ static __always_inline bool query_flow_filter(struct network_flow flow,
       for (int i = 0; i < num_buckets; ++i) {
       
             int offset = murmurhash(flow_key, i) % BITS_PER_SLICE;
+           
             int hashIndex = i * BITS_PER_SLICE + offset;
-      
-            bool *set = bpf_map_lookup_elem(&flow_filter, &hashIndex);
+
+            bool *set = NULL;            
+            
+            if(flowfilterID == X)
+                set = bpf_map_lookup_elem(&flow_filter_X, &hashIndex);
+    
+            else if(flowfilterID == Y) 
+                set = bpf_map_lookup_elem(&flow_filter_Y, &hashIndex);
       
             if (set) {
                 if (*set == false) {
@@ -163,17 +147,13 @@ static __always_inline bool query_flow_filter(struct network_flow flow,
 }
 
 static __always_inline 
-int insert_flow_to_counting_table(struct network_flow flow, bool old_flow) {
+int insert_flow_to_counting_table(struct network_flow flow, bool old_flow, int countingTableID) {
 
       int num_buckets = COUNTING_TABLE_HASH_COUNT;
 
       __u128 flowKey = 0;
       memcpy(&flowKey, &flow, sizeof(struct network_flow));
       
-      initalize_counting_table_locks();
-
-      lock_counting_table();
-
       for (int i = 0; i < num_buckets; ++i) {
 
           __u32 j = i;
@@ -185,36 +165,59 @@ int insert_flow_to_counting_table(struct network_flow flow, bool old_flow) {
 
           if (old_flow == true) {
             // Packet Comes from an existing flow
-                ct = bpf_map_lookup_elem(&counting_table, &bucket_index);
 
-                if (ct) {
-                    struct counting_table_entry cte = *ct;
-                    // cte.flowXOR ^= flowKey;
-                    cte.packetCount++;
-                    bpf_map_update_elem(&counting_table, &bucket_index, &cte, BPF_EXIST);
-                } 
-                else {
-                    return -1;
-                }
+              if(countingTableID == X){
+                ct = bpf_map_lookup_elem(&counting_table_X, &bucket_index);
+              }
+              else if(countingTableID == Y) {
+                ct = bpf_map_lookup_elem(&counting_table_Y, &bucket_index);
+              }
+              if (ct) {
+                  struct counting_table_entry cte = *ct;
+                  // cte.flowXOR ^= flowKey;
+                  cte.packetCount++;
+                  
+                  if(countingTableID == X) {
+                      bpf_map_update_elem(&counting_table_X, &bucket_index, &cte, BPF_EXIST);
+                  } 
+                  else if(countingTableID == Y) {
+                      bpf_map_update_elem(&counting_table_Y, &bucket_index, &cte, BPF_EXIST);
+                  }
+                  return 0;
+              } 
+              else {
+                  return -1;
+              }
 
           } else {
             // Packet Comes from a new flow
-                ct = bpf_map_lookup_elem(&counting_table, &bucket_index);
-
+                if(countingTableID == X) {
+                    ct = bpf_map_lookup_elem(&counting_table_X, &bucket_index);
+                }
+                else if(countingTableID == Y){
+                    ct = bpf_map_lookup_elem(&counting_table_Y, &bucket_index);
+                }
                 if (ct) {
+                    
                     struct counting_table_entry cte = *ct;
+                    
                     cte.flowXOR ^= flowKey;
                     cte.packetCount++;
                     cte.flowCount++;
-                    bpf_map_update_elem(&counting_table, &bucket_index, &cte, BPF_EXIST);
+                    
+                    if(countingTableID == X) {
+                        bpf_map_update_elem(&counting_table_X, &bucket_index, &cte, BPF_EXIST);
+                    }
+                    else if(countingTableID == Y) {
+                        bpf_map_update_elem(&counting_table_Y, &bucket_index, &cte, BPF_EXIST);
+                    }
+                    return 0;
                 }   
                 else {
                     return -1;
                 }
           }
       }
-
-      unlock_counting_table();
 
       return 0;
 }
@@ -270,19 +273,16 @@ int xdp_parse_flow(struct xdp_md *ctx) {
 
       } else if (ip->protocol == IPPROTO_UDP) {
 
-        if (data + sizeof(struct ethhdr) + sizeof(struct iphdr) +
-                sizeof(struct tcphdr) >=
-            data_end) {
-          return XDP_PASS;
-        }
+          if (data + sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct tcphdr) >= data_end) {
+              return XDP_PASS;
+          }
 
-        struct udphdr *udp = data + sizeof(struct ethhdr) + sizeof(struct iphdr);
-        source_port = udp->source;
-        dest_port = udp->dest;
+          struct udphdr *udp = data + sizeof(struct ethhdr) + sizeof(struct iphdr);
+          source_port = udp->source;
+          dest_port = udp->dest;
 
       } else if (ip->protocol == IPPROTO_ICMP) {
-
-        return XDP_PASS;
+          return XDP_PASS;
       }
 
       // bpf_printk("Flow: %-3u %-3u %-3u %-3u %-3u", source_ip, dest_ip,
@@ -297,24 +297,33 @@ int xdp_parse_flow(struct xdp_md *ctx) {
                                                         .protocol = protocol
                                                       };
       // print_flow(nflow);
-      bpf_printk("%u", nflow.dest_ip);
       // struct network_flow * nf = NULL;
 
       bool old_flow = false;
 
-      if (query_flow_filter(nflow, FLOW_FILTER_HASH_COUNT)) {
+      int flowSetIndex = FLOWSET_ID_INDEX;
+
+      __u32 * flowSetID = bpf_map_lookup_elem(&flowsetID, &flowSetIndex);
+      
+      if(flowSetID) {  
+          bpf_printk("FlowSetID: %u", *flowSetID);
+
+          if (query_flow_filter(nflow, FLOW_FILTER_HASH_COUNT, *flowSetID)) {
           
-          old_flow = true;
+              old_flow = true;
       
-      } else {
-      
-          insert_to_flow_filter(nflow);
-      
+          } else {
+          
+              insert_to_flow_filter(nflow, *flowSetID);
+          
+          }
+
+          insert_flow_to_counting_table(nflow, old_flow, *flowSetID);
+
+          return XDP_PASS;
       }
 
-      insert_flow_to_counting_table(nflow, old_flow);
-
-      return XDP_PASS;
+      
       
 }
 

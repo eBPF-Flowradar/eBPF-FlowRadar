@@ -2,9 +2,10 @@
 #include "single_decode.h"
 #include "concurrency.h"
 
+// #include <time.h>
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
-
+#include <pthread.h>
 #include <inttypes.h>
 #include <linux/if_link.h>
 #include <net/if.h>
@@ -15,6 +16,7 @@
 #include <sys/resource.h>
 #include <unistd.h>
 #include <xdp/libxdp.h>
+// #include <linux/time.h>
 
 static int ifindex;
 struct xdp_program *prog = NULL;
@@ -30,14 +32,14 @@ static void int_exit(int sig) {
 }
 
 static struct pureset_packet_count
-perform_single_decode(int counting_table_file_descriptor, int lock_table_file_descriptor) {
+perform_single_decode(int counting_table_file_descriptor) {
 
     struct flowset flow_set;
 
     for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
     
       struct counting_table_entry cte;
-      while(counting_table_is_locked(lock_table_file_descriptor));  
+
       int ret = bpf_map_lookup_elem(counting_table_file_descriptor, &i, &cte);
 
       if (ret == 0) {  
@@ -48,7 +50,27 @@ perform_single_decode(int counting_table_file_descriptor, int lock_table_file_de
     return single_decode(flow_set);
 }
 
-static void perform_counter_decode(int counting_table_file_descriptor, int lock_table_file_descriptor) {
+static void swap_tables(int flowsetIdMapFD){
+    
+    int index = 0;
+    __u32 value = 0;  
+    
+    bpf_map_lookup_elem(flowsetIdMapFD, &index, &value);
+    
+    if(value == 0) {
+        value = 1;
+        printf("MAP UPDATE:0->1\n");
+        bpf_map_update_elem(flowsetIdMapFD, &index, &value, BPF_ANY);
+    }
+    else if(value == 1) {
+        value = 0;
+        printf("MAP UPDATE:1->0\n");
+        bpf_map_update_elem(flowsetIdMapFD, &index, &value, BPF_ANY);
+    }
+
+}
+
+static void perform_counter_decode(int counting_table_file_descriptor) {
   
     struct flowset flow_set;
 
@@ -56,8 +78,6 @@ static void perform_counter_decode(int counting_table_file_descriptor, int lock_
     for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
     
         struct counting_table_entry cte;
-            
-        while(counting_table_is_locked(lock_table_file_descriptor));
 
         int ret = bpf_map_lookup_elem(counting_table_file_descriptor, &i, &cte);
 
@@ -69,25 +89,23 @@ static void perform_counter_decode(int counting_table_file_descriptor, int lock_
         
     }
 
-    struct pureset_packet_count pspc = perform_single_decode(counting_table_file_descriptor, lock_table_file_descriptor);
+    struct pureset_packet_count pspc = perform_single_decode(counting_table_file_descriptor);
     
     CD(flow_set, pspc);
 
 }
 
-static void initialize_bloom_filter(int flow_filter_file_descriptor, int lock_table_file_descriptor) {
+static void initialize_bloom_filter(int flow_filter_file_descriptor) {
 
       for (int i = 0; i < BLOOM_FILTER_SIZE; ++i) {
           bool set = false;
-          
-          while(flow_filter_is_locked(lock_table_file_descriptor));
 
           bpf_map_update_elem(flow_filter_file_descriptor, &i, &set, BPF_ANY);
       }
 
 }
 
-static void initialize_counting_table(int counting_table_file_desc, int lock_table_file_desc) {
+static void initialize_counting_table(int counting_table_file_desc) {
         
       for (int i = 0; i < COUNTING_TABLE_SIZE ; ++i) {
       
@@ -97,16 +115,35 @@ static void initialize_counting_table(int counting_table_file_desc, int lock_tab
               .packetCount = 0
           };
 
-          while(counting_table_is_locked(lock_table_file_desc));
-          
           bpf_map_update_elem(counting_table_file_desc, &i, &entry, BPF_ANY);
 
       }
 
 }
 
-static void poll_bloom_filter(int flow_filter_file_descriptor, int lock_table_file_descriptor,
-                              int poll_interval) {
+static void initalize_flow_set_id(int flowset_file_descriptor) {
+      int j = 0;
+      __u32 val = 0;
+      bpf_map_update_elem(flowset_file_descriptor, &j, &val, BPF_ANY);
+}
+
+/*
+static void initialize_timestamp(int timestamp_file_descriptor) {
+      
+      int j = 0;
+      
+      __u64 nanoseconds;
+      struct timespec currtime;
+
+      clock_gettime(CLOCK_REALTIME, &currtime);
+      
+      nanoseconds = &currtime.tv_nsec;
+      bpf_map_update_elem(timestamp_file_descriptor, &j, &nanoseconds, BPF_ANY);
+
+}
+*/
+
+static void poll_bloom_filter(int flow_filter_file_descriptor, int poll_interval) {
 
     while (1) {
 
@@ -117,8 +154,6 @@ static void poll_bloom_filter(int flow_filter_file_descriptor, int lock_table_fi
             
             bool set_bit = false;
         
-            while(flow_filter_is_locked(lock_table_file_descriptor));
-
             bpf_map_lookup_elem(flow_filter_file_descriptor, &i, &set_bit);
             
             if (i == BLOOM_FILTER_SIZE - 1) {
@@ -137,97 +172,57 @@ static void poll_bloom_filter(int flow_filter_file_descriptor, int lock_table_fi
     }
 }
 
-static void poll_counting_table(int counting_table_file_descriptor, int lock_table_file_descriptor,
-                                int poll_interval) {
-  while (1) {
-
-      FILE *fptr;
-      fptr = fopen("counting_table_logs.csv", "a");
-      
-      for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
-        
-          struct counting_table_entry cte;
+static void poll_and_perform_counter_decode(int counting_table_file_descriptor1, int counting_table_file_descriptor2, 
+                                int flowset_id_file_desc, int bloom_filter_file_descriptor1, int bloom_filter_file_descriptor2) {
     
-          while(counting_table_is_locked(lock_table_file_descriptor));
-    
-          bpf_map_lookup_elem(counting_table_file_descriptor, &i, &cte);
-    
-          flow_key_buff[i] = cte.flowXOR;
-          flow_count_buff[i] = cte.flowCount;
-          packet_count_buff[i] = cte.packetCount;
-      
-      }
+    sleep(120);
+    while(true){
 
-      char str[32];
-          
-      for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
+        int key = 0;
+        __u32 flowsetId = 0;
 
-          memset(str, '\0', sizeof(str));
-          sprintf(str, "%" PRIx64 "%016" PRIx64, (uint64_t)(flow_key_buff[i]>> 64), (uint64_t)flow_key_buff[i]);
+        bpf_map_lookup_elem(flowset_id_file_desc, &key, &flowsetId);
 
-          if (i == COUNTING_TABLE_SIZE - 1) {
-          
-            fprintf(fptr, "%s\n", str);
-          
-          } else if (i == 0) {
-          
-            fprintf(fptr, "FlowXOR, %s, ", str);
-          
-          } else {
-          
-            fprintf(fptr, "%s, ", str);
-          
-          }
-
-      }
-
-      for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
-        
-        if (i == COUNTING_TABLE_SIZE - 1) {
-          fprintf(fptr, "%d\n", flow_count_buff[i]);
+        if(flowsetId == 0) 
+        {
+            perform_counter_decode(counting_table_file_descriptor1);
         } 
-        else if (i == 0) {
-          fprintf(fptr, "FlowCount, %d, ", flow_count_buff[i]);
-        } 
-        else {
-          fprintf(fptr, "%d, ", flow_count_buff[i]);
+        else if(flowsetId == 1) 
+        {
+            perform_counter_decode(counting_table_file_descriptor2);
+        }        
+
+        swap_tables(flowset_id_file_desc);
+        
+        if(flowsetId == 1) 
+        {
+            initialize_counting_table(counting_table_file_descriptor1);
+            initialize_bloom_filter(bloom_filter_file_descriptor1);
+        }
+        else if(flowsetId == 0)
+        {
+            initialize_counting_table(counting_table_file_descriptor2);
+            initialize_bloom_filter(bloom_filter_file_descriptor2);
         }
 
-      }
-
-      for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
-          if (i == COUNTING_TABLE_SIZE - 1) {
-            fprintf(fptr, "%d\n", packet_count_buff[i]);
-          } 
-          else if (i == 0) {
-            fprintf(fptr, "PacketCount, %d, ", packet_count_buff[i]);
-          } 
-          else {
-            fprintf(fptr, "%d, ", packet_count_buff[i]);
-          }
-      }
-
-      fclose(fptr);
-      sleep(poll_interval);
-  }
+        usleep(30000000);
+        // sleep for 280ms
+    }
 }
 
-static void print_entry_counting_table(int counting_table_file_descriptor, int lock_table_file_descriptor,
-                                       int poll_interval) {
+static void print_entry_counting_table(int counting_table_file_descriptor, int poll_interval) {
 
   int loop = 0;
 
   while (1) {
 
       printf("Poll No : %d\n", loop);
-      printf("FlowXOR ,FlowCount ,PacketCount\n");
+      printf("FlowXOR, FlowCount, PacketCount\n");
 
       for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
 
           struct counting_table_entry cte;
 
-          while(counting_table_is_locked(lock_table_file_descriptor));
-          
           bpf_map_lookup_elem(counting_table_file_descriptor, &i, &cte);
           
           if (cte.flowXOR) {
@@ -244,7 +239,7 @@ static void print_entry_counting_table(int counting_table_file_descriptor, int l
       loop++;
 
       printf("PureCells\n");
-      struct pureset_packet_count pspc = perform_single_decode(counting_table_file_descriptor, lock_table_file_descriptor);
+      struct pureset_packet_count pspc = perform_single_decode(counting_table_file_descriptor);
 
       for (int i = 0; i < pspc.flowset.latest_index; i++) {
         printf("%" PRIx64 "%016" PRIx64 "\n",
@@ -300,25 +295,25 @@ int main(int argc, char *argv[]) {
 
   bpf_obj = xdp_program__bpf_obj(prog);
 
-  int counting_table_fd = bpf_object__find_map_fd_by_name(bpf_obj, "counting_table");
-  int flow_filter_fd = bpf_object__find_map_fd_by_name(bpf_obj, "flow_filter");
-  int lock_table_fd= bpf_object__find_map_fd_by_name(bpf_obj, "lock_table");
+  int counting_table_fd1 = bpf_object__find_map_fd_by_name(bpf_obj, "counting_table_X");
+  int counting_table_fd2 = bpf_object__find_map_fd_by_name(bpf_obj, "counting_table_Y");
+  int flow_filter_fd1 = bpf_object__find_map_fd_by_name(bpf_obj, "flow_filter_X");
+  int flow_filter_fd2 = bpf_object__find_map_fd_by_name(bpf_obj, "flow_filter_Y");
+  int flow_set_fd = bpf_object__find_map_fd_by_name(bpf_obj, "flowsetID");
+  int time_stamp_fd = bpf_object__find_map_fd_by_name(bpf_obj, "program_start_time");
 
-  initialize_bloom_filter(flow_filter_fd, lock_table_fd);
-  initialize_counting_table(counting_table_fd, lock_table_fd);
+  initialize_bloom_filter(flow_filter_fd1);
+  initialize_bloom_filter(flow_filter_fd2);
+  initialize_counting_table(counting_table_fd1);
+  initialize_counting_table(counting_table_fd2);
+  // initialize_timestamp(time_stamp_fd);
+  initalize_flow_set_id(flow_set_fd);
 
   // poll_counting_table(counting_table_fd, 2);
   // poll_bloom_filter(flow_filter_fd, 1);
   // print_entry_counting_table(counting_table_fd, 2);
-  sleep(30);
-   
-  while (true)
-  {
-    perform_counter_decode(counting_table_fd,lock_table_fd);
-    sleep(30);
-    /* code */
-  }
   
+  poll_and_perform_counter_decode(counting_table_fd1, counting_table_fd2, flow_set_fd, flow_filter_fd1, flow_filter_fd2);
   
   int_exit(0);
   return 0;
