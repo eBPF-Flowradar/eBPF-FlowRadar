@@ -16,14 +16,12 @@
 static int ifindex;
 struct xdp_program *prog = NULL;
 
-// __u128 flow_key_buff[COUNTING_TABLE_SIZE];
-// __u32 flow_count_buff[COUNTING_TABLE_SIZE];
-// __u32 packet_count_buff[COUNTING_TABLE_SIZE];
+
 
 static void int_exit(int sig) {
   xdp_program__detach(prog, ifindex, XDP_MODE_SKB, 0);
   xdp_program__close(prog);
-  exit(0);
+  exit(sig);
 }
 
 
@@ -46,15 +44,21 @@ static void initialize_counting_table(int counting_table_file_desc) {
 
 
 
-static void start_decode(int counting_table_file_descriptor,int flow_filter_file_descriptor,
-                                       int poll_interval) {
+static void start_decode(int counting_table_file_descriptor,int flow_filter_file_descriptor) {
 
   int loop = 0;
 
   while (1) {
 
+    //Collect data at poll interval
+    usleep(POLL_TIME_US);
+
+
+    //variable to store whether the counting table is empty or not
+    bool ct_empty=true; 
+
     loop++;
-    printf("Poll No : %d\n", loop);
+    printf("\nPoll No : %d\n", loop);
     printf("FlowXOR ,FlowCount ,PacketCount\n");
 
     struct flowset flow_set;
@@ -65,16 +69,24 @@ static void start_decode(int counting_table_file_descriptor,int flow_filter_file
     for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
       struct counting_table_entry cte;
       int ret = bpf_map_lookup_elem(counting_table_file_descriptor, &i, &cte);
+      //TODO: could this be more efficient?
       if (ret == 0) {
         flow_set.counting_table[i] = cte;
         pktCount[i]=cte.packetCount;
       }
       if (cte.flowXOR) {
+        ct_empty=false;
         printf("%" PRIx64 "%016" PRIx64, (uint64_t)(cte.flowXOR >> 64),
               (uint64_t)cte.flowXOR);
         printf(" ,%d ,%d\n", cte.flowCount, cte.packetCount);
       // printf("%x ,%d ,%d\n", cte.flowXOR, cte.flowCount, cte.packetCount);
       }
+    }
+
+    //Continue the loop if counting table is empty
+    if(ct_empty){
+      printf("Counting table empty!!!\n");
+      continue;
     }
 
 
@@ -106,8 +118,6 @@ static void start_decode(int counting_table_file_descriptor,int flow_filter_file
     // counter_decode(flow_set,pure_set,pktCount);
 
 
-    
-    sleep(poll_interval);   
   }
 }
 
@@ -160,7 +170,7 @@ int main(int argc, char *argv[]) {
   initialize_bloom_filter(flow_filter_fd);
   initialize_counting_table(counting_table_fd);
 
-  start_decode(counting_table_fd,flow_filter_fd,5);
+  start_decode(counting_table_fd,flow_filter_fd);
 
   int_exit(0);
   return 0;

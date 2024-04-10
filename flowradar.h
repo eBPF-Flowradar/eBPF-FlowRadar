@@ -13,6 +13,8 @@
 // #define NUM_SLICES 7
 #define BITS_PER_SLICE 35000
 // #define BUCKET_SIZE 7500
+#define POLL_TIME_MS  280  //in milliseconds (280)
+#define POLL_TIME_US POLL_TIME_MS*1000
 
 struct pureset {
   __u128 purecells[MAX_PURE_CELLS];
