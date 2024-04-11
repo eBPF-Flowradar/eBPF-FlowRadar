@@ -27,8 +27,10 @@
 1. Errors due to empty flowsets being passed down to gsl [x]
 
 # Important Commands
-1. `sudo ip link set dev enp1s0  xdpgeneric off` : To unload XDP program from enp1s0 interface
-2.  `sudo ip link show dev enp1s0` : Shows if XDP program is loaded in enp1s0 interface
+1.`sudo ip link set dev enp1s0  xdpgeneric off` : To unload XDP program from enp1s0 interface
+2.`sudo ip link show dev enp1s0` : Shows if XDP program is loaded in enp1s0 interface
+3.`sudo cat /sys/kernel/tracing/trace_pipe` : bpf tracepipe
+4.`sudo ip link set dev <interface> up` : setting the interface up
 
 # Notes
 1. The 110k_24k_caida.pcap has raw ip packets without the ethernet header, this causes issues with our program as it expects ethernet headers, currently while testing with scapy we are adding the ethernet headers and sending to the interface.
