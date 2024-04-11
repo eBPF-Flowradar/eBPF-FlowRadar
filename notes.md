@@ -4,6 +4,7 @@
 3. Doubt in Counter decode in figure paper.
 4. XDP can only capture packets from RX (incoming side). Is that a problem ?
 5. See #Notes 1
+6. Ask about hashes are implemented for consistent implementation with theirs
 
 # Check
 1. Check all TODOs
