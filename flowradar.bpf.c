@@ -137,7 +137,8 @@ int xdp_parse_flow(struct xdp_md *ctx) {
   struct ethhdr *eth = data;
   __u16 h_proto;
 
-  // Packet Does not Contain Ethernet Header
+  // Packet Does not Contain Ethernet Header (Even if this passes it might not contain eth header as it can
+  // be a raw IP packet)
   if (data + sizeof(struct ethhdr) >= data_end)
     return XDP_PASS;
 

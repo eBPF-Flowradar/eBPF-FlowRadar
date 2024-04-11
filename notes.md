@@ -3,6 +3,7 @@
 2. We will be having this installed in every host?[x]
 3. Doubt in Counter decode in figure paper.
 4. XDP can only capture packets from RX (incoming side). Is that a problem ?
+5. See #Notes 1
 
 # Check
 1. Check all TODOs
@@ -13,7 +14,7 @@
 6. Concurrency controls - use two flowsets
 7. murmur hash implementations
 8. make time to 280ms[x]
-9. Test with bridging
+9. Test with bridging[x]
 
 # Things Need to be done
 1. Pureset need not be a set as the flows added will be unique always [x]
@@ -28,3 +29,11 @@
 # Important Commands
 1. `sudo ip link set dev enp1s0  xdpgeneric off` : To unload XDP program from enp1s0 interface
 2.  `sudo ip link show dev enp1s0` : Shows if XDP program is loaded in enp1s0 interface
+
+# Notes
+1. The 110k_24k_caida.pcap has raw ip packets without the ethernet header, this causes issues with our program as it expects ethernet headers, currently while testing with scapy we are adding the ethernet headers and sending to the interface.
+
+# Resources to setup veth
+1. Run script.sh
+2. Check https://linuxconfig.org/how-to-use-bridged-networking-with-libvirt-and-kvm to setup with virt-manager
+3. Add interface to virt-manager and ensure the interface is up
