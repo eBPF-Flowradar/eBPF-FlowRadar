@@ -17,7 +17,7 @@
 8. make time to 280ms[x]
 9. Test with bridging[x]
 10. Test the implementation
-
+11. Some random packets are being sent on the interface
 # Things Need to be done
 1. Pureset need not be a set as the flows added will be unique always [x]
 2. Change implementation of single decode to perform it until no pure cells exist [x]
@@ -31,7 +31,7 @@
 # Important Commands
 1.`sudo ip link set dev enp1s0  xdpgeneric off` : To unload XDP program from enp1s0 interface
 2.`sudo ip link show dev enp1s0` : Shows if XDP program is loaded in enp1s0 interface
-3.`sudo cat /sys/kernel/tracing/trace_pipe` : bpf tracepipe
+3.`sudo cat /sys/kernel/tracing/trace_pipe` : bpf tracepipe (bpf_printk() for printing)
 4.`sudo ip link set dev <interface> up` : setting the interface up
 
 # Notes

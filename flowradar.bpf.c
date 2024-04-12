@@ -204,7 +204,7 @@ int xdp_parse_flow(struct xdp_md *ctx) {
 
   // Packet Does not Contain Ethernet Header (Even if this passes it might not contain eth header as it can
   // be a raw IP packet)
-  if (data + sizeof(struct ethhdr) >= data_end)
+  if (data + sizeof(struct ethhdr) > data_end)
     return XDP_PASS;
 
   h_proto = eth->h_proto;
@@ -215,7 +215,7 @@ int xdp_parse_flow(struct xdp_md *ctx) {
   }
 
   // Data Does not Contain IP Header
-  if (data + sizeof(struct ethhdr) + sizeof(struct iphdr) >= data_end) {
+  if (data + sizeof(struct ethhdr) + sizeof(struct iphdr) > data_end) {
     return XDP_PASS;
   }
 
@@ -232,7 +232,7 @@ int xdp_parse_flow(struct xdp_md *ctx) {
   if (ip->protocol == IPPROTO_TCP) {
 
     if (data + sizeof(struct ethhdr) + sizeof(struct iphdr) +
-            sizeof(struct tcphdr) >=
+            sizeof(struct tcphdr) >
         data_end) {
       return XDP_PASS;
     }
@@ -244,7 +244,7 @@ int xdp_parse_flow(struct xdp_md *ctx) {
   } else if (ip->protocol == IPPROTO_UDP) {
 
     if (data + sizeof(struct ethhdr) + sizeof(struct iphdr) +
-            sizeof(struct tcphdr) >=
+            sizeof(struct udphdr) >
         data_end) {
       return XDP_PASS;
     }
