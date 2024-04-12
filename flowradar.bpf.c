@@ -253,7 +253,7 @@ int xdp_parse_flow(struct xdp_md *ctx) {
     source_port = udp->source;
     dest_port = udp->dest;
 
-  } else if (ip->protocol == IPPROTO_ICMP) {
+  } else /*if (ip->protocol == IPPROTO_ICMP)*/ {
 
     return XDP_PASS;
   }
@@ -269,6 +269,7 @@ int xdp_parse_flow(struct xdp_md *ctx) {
                                                     .protocol = protocol};
   // print_flow(nflow);
   // struct network_flow * nf = NULL;
+  // bpf_printk("%x",nflow);
 
   bool old_flow = false;
 
