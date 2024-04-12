@@ -15,6 +15,7 @@
 
 static int ifindex;
 struct xdp_program *prog = NULL;
+int first=0; //used for accessing the only element in flowset_id
 
 
 
@@ -25,7 +26,7 @@ static void int_exit(int sig) {
 }
 
 
-static void initialize_bloom_filter(int flow_filter_file_descriptor) {
+static void initialize_flow_filter(int flow_filter_file_descriptor) {
 
   for (int i = 0; i < BLOOM_FILTER_SIZE; ++i) {
     bool set = false;
@@ -44,11 +45,11 @@ static void initialize_counting_table(int counting_table_file_desc) {
 
 
 
-static void start_decode(int counting_table_file_descriptor,int flow_filter_file_descriptor) {
+static void start_decode(int ct_fd_0,int ff_fd_0,int ct_fd_1,int ff_fd_1,int flowset_id_fd) {
 
   int loop = 0;
 
-  while (1) {
+  while (true) {
 
     //Collect data at poll interval
     usleep(POLL_TIME_US);
@@ -64,11 +65,39 @@ static void start_decode(int counting_table_file_descriptor,int flow_filter_file
     struct flowset flow_set;
     __u32 pktCount[COUNTING_TABLE_SIZE];
 
+    //Get map currently in use
+    bool current;
+    int counting_table_fd,flow_filter_fd;
+    bpf_map_lookup_elem(flowset_id_fd, &first, &current);
+    // if(ret<0){
+    //   return ret;
+    // }
+    if(current){
+      counting_table_fd=ct_fd_1;
+      flow_filter_fd=ff_fd_1;
+      printf("Flowset 1 in use\n");
+    }else{
+      counting_table_fd=ct_fd_0;
+      flow_filter_fd=ff_fd_0;
+      printf("Flowset 0 in use\n");
+    }
+  
+    //invert Flowset_ID
+    bool set=!current;
+    bpf_map_update_elem(flowset_id_fd, &first, &set, BPF_EXIST);
+    // if(ret<0){
+    //   return ret;
+    // }
+
+
+
+
+
     //TODO: check for more efficient ways of copying maps to userspace
-    //TODO: Concurrency control
+    //DONE: Using two flowsets
     for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
       struct counting_table_entry cte;
-      int ret = bpf_map_lookup_elem(counting_table_file_descriptor, &i, &cte);
+      int ret = bpf_map_lookup_elem(counting_table_fd, &i, &cte);
       //TODO: could this be more efficient?
       if (ret == 0) {
         flow_set.counting_table[i] = cte;
@@ -92,8 +121,8 @@ static void start_decode(int counting_table_file_descriptor,int flow_filter_file
 
     //reset the flowset 
     //TODO : better way to do this?
-    initialize_bloom_filter(flow_filter_file_descriptor);
-    initialize_counting_table(counting_table_file_descriptor);
+    initialize_flow_filter(flow_filter_fd);
+    initialize_counting_table(counting_table_fd);
 
 
     //perform single decode and print the purecells
@@ -163,14 +192,29 @@ int main(int argc, char *argv[]) {
 
   bpf_obj = xdp_program__bpf_obj(prog);
 
-  int counting_table_fd =
-      bpf_object__find_map_fd_by_name(bpf_obj, "counting_table");
-  int flow_filter_fd = bpf_object__find_map_fd_by_name(bpf_obj, "flow_filter");
+  int Counting_table_fd_0 =
+      bpf_object__find_map_fd_by_name(bpf_obj, "Counting_table_0");
+  int Flow_filter_fd_0 = bpf_object__find_map_fd_by_name(bpf_obj, "Flow_filter_0");
+  int Counting_table_fd_1 =
+      bpf_object__find_map_fd_by_name(bpf_obj, "Counting_table_1");
+  int Flow_filter_fd_1 = bpf_object__find_map_fd_by_name(bpf_obj, "Flow_filter_1");
 
-  initialize_bloom_filter(flow_filter_fd);
-  initialize_counting_table(counting_table_fd);
 
-  start_decode(counting_table_fd,flow_filter_fd);
+  int Flowset_id_fd=bpf_object__find_map_fd_by_name(bpf_obj, "Flowset_ID");
+
+  //initialize Flowset_ID
+  bool set=false;
+  bpf_map_update_elem(Flowset_id_fd, &first, &set, BPF_ANY);
+  // if(ret<0){
+  //   return ret;
+  // }
+
+  initialize_flow_filter(Flow_filter_fd_0);
+  initialize_counting_table(Counting_table_fd_0);
+  initialize_flow_filter(Flow_filter_fd_1);
+  initialize_counting_table(Counting_table_fd_1);
+
+  start_decode(Counting_table_fd_0,Flow_filter_fd_0,Counting_table_fd_1,Flow_filter_fd_1,Flowset_id_fd);
 
   int_exit(0);
   return 0;

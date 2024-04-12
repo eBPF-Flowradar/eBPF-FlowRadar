@@ -8,14 +8,15 @@
 
 # Check
 1. Check all TODOs
-2. Check if memory allocated is deallocated
+2. Check if memory allocated is deallocated and also proper error checking
 3. Check consistency of hashing (in IITH and our impl)
 4. Verify lsqr solver(partially verified)
 5. Standard values to be used 
-6. Concurrency controls - use two flowsets
+6. Concurrency controls - use two flowsets [x]
 7. murmur hash implementations
 8. make time to 280ms[x]
 9. Test with bridging[x]
+10. Test the implementation
 
 # Things Need to be done
 1. Pureset need not be a set as the flows added will be unique always [x]

@@ -29,22 +29,51 @@
 //  __uint(map_extra, BLOOM_FILTER_HASH_COUNT);
 //} bloom_filter SEC(".maps");
 
-// Define the Counting Table
+//Stucture to decide which flowset should be used
+struct {
+  __uint(type, BPF_MAP_TYPE_ARRAY);
+  __type(key, int);
+  __type(value, bool);
+  __uint(max_entries, 1);
+} Flowset_ID SEC(".maps");
+
+
+// Define the Counting Table 0
 struct {
   __uint(type, BPF_MAP_TYPE_ARRAY);
   __type(key, int);
   __type(value, struct counting_table_entry);
   __uint(max_entries, COUNTING_TABLE_SIZE);
-} counting_table SEC(".maps");
+} Counting_table_0 SEC(".maps");
 
+//Define the flow filter 0
 struct {
   __uint(type, BPF_MAP_TYPE_ARRAY);
   __type(key, int);
   __type(value, bool);
   __uint(max_entries, BLOOM_FILTER_SIZE);
-} flow_filter SEC(".maps");
+} Flow_filter_0 SEC(".maps");
 
-static __always_inline int insert_to_flow_filter(struct network_flow flow) {
+
+// Define the Counting Table 1
+struct {
+  __uint(type, BPF_MAP_TYPE_ARRAY);
+  __type(key, int);
+  __type(value, struct counting_table_entry);
+  __uint(max_entries, COUNTING_TABLE_SIZE);
+} Counting_table_1 SEC(".maps");
+
+//Define the flow filter 1
+struct {
+  __uint(type, BPF_MAP_TYPE_ARRAY);
+  __type(key, int);
+  __type(value, bool);
+  __uint(max_entries, BLOOM_FILTER_SIZE);
+} Flow_filter_1 SEC(".maps");
+
+
+
+static __always_inline int insert_to_flow_filter(struct network_flow flow,bool flowset_id) {
 
   __u128 flow_key = 0;
   memcpy(&flow_key, &flow, sizeof(struct network_flow));
@@ -53,13 +82,17 @@ static __always_inline int insert_to_flow_filter(struct network_flow flow) {
     int offset = murmurhash(flow_key, i) % BITS_PER_SLICE;
     int hashIndex = i * BITS_PER_SLICE + offset;
     bool bit = true;
-    bpf_map_update_elem(&flow_filter, &hashIndex, &bit, BPF_ANY);
+    if(flowset_id){
+      bpf_map_update_elem(&Flow_filter_1, &hashIndex, &bit, BPF_ANY);
+    }else{
+      bpf_map_update_elem(&Flow_filter_0, &hashIndex, &bit, BPF_ANY);
+    }
   }
 
   return 0;
 }
 
-static __always_inline bool query_flow_filter(struct network_flow flow) {
+static __always_inline bool query_flow_filter(struct network_flow flow,bool flowset_id) {
 
   __u128 flow_key = 0;
   memcpy(&flow_key, &flow, sizeof(struct network_flow));
@@ -67,7 +100,12 @@ static __always_inline bool query_flow_filter(struct network_flow flow) {
   for (int i = 0; i < FLOW_FILTER_HASH_COUNT; ++i) {
     int offset = murmurhash(flow_key, i) % BITS_PER_SLICE;
     int hashIndex = i * BITS_PER_SLICE + offset;
-    bool *set = bpf_map_lookup_elem(&flow_filter, &hashIndex);
+    bool *set;
+    if(flowset_id){
+      set = bpf_map_lookup_elem(&Flow_filter_1, &hashIndex);
+    }else{
+      set = bpf_map_lookup_elem(&Flow_filter_0, &hashIndex);
+    }
     if (set) {
       if (*set == false) {
         return false;
@@ -78,7 +116,7 @@ static __always_inline bool query_flow_filter(struct network_flow flow) {
 }
 
 static __always_inline int
-insert_flow_to_counting_table(struct network_flow flow, bool old_flow) {
+insert_flow_to_counting_table(struct network_flow flow, bool old_flow,bool flowset_id) {
 
   //int num_buckets = COUNTING_TABLE_HASH_COUNT;
 
@@ -90,37 +128,65 @@ insert_flow_to_counting_table(struct network_flow flow, bool old_flow) {
     __u32 j = i;
 
     struct counting_table_entry *ct = NULL;
+    struct counting_table_entry cte;
 
     int bucket_index = jhash_flow(flow, j) % COUNTING_TABLE_SIZE;
     // Hash Value % BUCKET_SIZE 7500;
 
-    if (old_flow == true) {
-      // Packet Comes from an existing flow
-      ct = bpf_map_lookup_elem(&counting_table, &bucket_index);
-
-      if (ct) {
-        struct counting_table_entry cte = *ct;
-        // cte.flowXOR ^= flowKey;
-        cte.packetCount++;
-        bpf_map_update_elem(&counting_table, &bucket_index, &cte, BPF_EXIST);
-      } else {
-        return -1;
-      }
-
-    } else {
-      // Packet Comes from a new flow
-      ct = bpf_map_lookup_elem(&counting_table, &bucket_index);
-
-      if (ct) {
-        struct counting_table_entry cte = *ct;
-        cte.flowXOR ^= flowKey;
-        cte.packetCount++;
-        cte.flowCount++;
-        bpf_map_update_elem(&counting_table, &bucket_index, &cte, BPF_EXIST);
-      } else {
-        return -1;
-      }
+    if(flowset_id){
+        ct = bpf_map_lookup_elem(&Counting_table_1, &bucket_index);
+    }else{
+        ct = bpf_map_lookup_elem(&Counting_table_0, &bucket_index);
     }
+
+    if(ct){
+      cte=*ct;
+    }else{
+      return -1;
+    }
+
+    if(old_flow){
+      cte.packetCount++; 
+    }else{
+      cte.flowXOR ^= flowKey;
+      cte.packetCount++;
+      cte.flowCount++;
+    }
+
+    if(flowset_id){
+      bpf_map_update_elem(&Counting_table_1, &bucket_index, &cte, BPF_EXIST);
+    }else{
+      bpf_map_update_elem(&Counting_table_0, &bucket_index, &cte, BPF_EXIST);
+    }
+
+
+    // if (old_flow == true) {
+    //   // Packet Comes from an existing flow
+    //   // ct = bpf_map_lookup_elem(&counting_table, &bucket_index);
+
+    //   if (ct) {
+    //     struct counting_table_entry cte = *ct;
+    //     // cte.flowXOR ^= flowKey;
+    //     cte.packetCount++;
+    //     bpf_map_update_elem(&counting_table, &bucket_index, &cte, BPF_EXIST);
+    //   } else {
+    //     return -1;
+    //   }
+
+    // } else {
+    //   // Packet Comes from a new flow
+    //   // ct = bpf_map_lookup_elem(&counting_table, &bucket_index);
+
+    //   if (ct) {
+    //     struct counting_table_entry cte = *ct;
+    //     cte.flowXOR ^= flowKey;
+    //     cte.packetCount++;
+    //     cte.flowCount++;
+    //     bpf_map_update_elem(&counting_table, &bucket_index, &cte, BPF_EXIST);
+    //   } else {
+    //     return -1;
+    //   }
+    // }
   }
 
   return 0;
@@ -206,14 +272,28 @@ int xdp_parse_flow(struct xdp_md *ctx) {
 
   bool old_flow = false;
 
-  //checking whether old flow and insert if its not
-  if (query_flow_filter(nflow)) {
-    old_flow = true;
-  } else {
-    insert_to_flow_filter(nflow);
+  //Get the ID of the flowset to which the flow should be inserted
+  int temp=0;
+  bool *flowset_id_ptr = bpf_map_lookup_elem(&Flowset_ID, &temp);
+  bool flowset_id;
+
+  if(flowset_id_ptr){
+    flowset_id=*flowset_id_ptr;
+  }else{
+    //if flowset_id not initialized start from 0
+    flowset_id=false;
   }
 
-  insert_flow_to_counting_table(nflow, old_flow);
+
+
+  //checking whether old flow and insert if its not
+  if (query_flow_filter(nflow,flowset_id)) {
+    old_flow = true;
+  } else {
+    insert_to_flow_filter(nflow,flowset_id);
+  }
+
+  insert_flow_to_counting_table(nflow, old_flow,flowset_id);
 
   return XDP_PASS;
 }
