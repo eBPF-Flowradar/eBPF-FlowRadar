@@ -59,13 +59,12 @@ static __always_inline int insert_to_flow_filter(struct network_flow flow) {
   return 0;
 }
 
-static __always_inline bool query_flow_filter(struct network_flow flow,
-                                              int num_buckets) {
+static __always_inline bool query_flow_filter(struct network_flow flow) {
 
   __u128 flow_key = 0;
   memcpy(&flow_key, &flow, sizeof(struct network_flow));
 
-  for (int i = 0; i < num_buckets; ++i) {
+  for (int i = 0; i < FLOW_FILTER_HASH_COUNT; ++i) {
     int offset = murmurhash(flow_key, i) % BITS_PER_SLICE;
     int hashIndex = i * BITS_PER_SLICE + offset;
     bool *set = bpf_map_lookup_elem(&flow_filter, &hashIndex);
@@ -81,12 +80,12 @@ static __always_inline bool query_flow_filter(struct network_flow flow,
 static __always_inline int
 insert_flow_to_counting_table(struct network_flow flow, bool old_flow) {
 
-  int num_buckets = COUNTING_TABLE_HASH_COUNT;
+  //int num_buckets = COUNTING_TABLE_HASH_COUNT;
 
   __u128 flowKey = 0;
   memcpy(&flowKey, &flow, sizeof(struct network_flow));
 
-  for (int i = 0; i < num_buckets; ++i) {
+  for (int i = 0; i < COUNTING_TABLE_HASH_COUNT; ++i) {
 
     __u32 j = i;
 
@@ -207,7 +206,8 @@ int xdp_parse_flow(struct xdp_md *ctx) {
 
   bool old_flow = false;
 
-  if (query_flow_filter(nflow, FLOW_FILTER_HASH_COUNT)) {
+  //checking whether old flow and insert if its not
+  if (query_flow_filter(nflow)) {
     old_flow = true;
   } else {
     insert_to_flow_filter(nflow);
