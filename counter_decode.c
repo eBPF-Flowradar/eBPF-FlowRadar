@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <inttypes.h>
+#include <time.h>
 
 gsl_matrix *array_matrix_convert(double **eq_matrix, int num_purecells) {
 
@@ -132,13 +133,31 @@ int counter_decode(struct pureset pure_set, __u32 pktCount[COUNTING_TABLE_SIZE])
 
   double *sol_array = method_lsq(eq_matrix, pktcount_matrix, num_purecells);
   printf("\nCounter Decode complete...\n");
+
+  FILE *fptr;
+  fptr=fopen("cd_logs.csv","a");
+
+  if (fptr == NULL) {
+    perror("Error opening file");
+    return -1;  // or handle the error as needed
+  }
+
   for (int i = 0; i < num_purecells; i++) {
       printf("Purecell: ");
       printf("%" PRIx64 "%016" PRIx64,
              (uint64_t)(pure_set.purecells[i] >> 64),
              (uint64_t)pure_set.purecells[i]);
-    printf(" | Packet_count:%f\n", sol_array[i]);
+    printf(" | Packet_count:%d\n",(int) round(sol_array[i]));  //rounding off to nearest integer
+    
+    //write to log file
+    fprintf(fptr,"%lu,",(unsigned long)time(NULL));  //timestamp
+    fprintf(fptr,"%" PRIx64 "%016" PRIx64",",
+             (uint64_t)(pure_set.purecells[i] >> 64),
+             (uint64_t)pure_set.purecells[i]);
+    fprintf(fptr,"%d\n",(int)round(sol_array[i]));  //rounding off to nearest integer
   }
+
+  fclose(fptr);
 
   //free all memory
   for (int i = 0; i < COUNTING_TABLE_SIZE; i++) {

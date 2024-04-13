@@ -1,5 +1,5 @@
 CFLAGS:= -g -O2 -Wall -Wextra
-GFLAGS:= -lxdp -lbpf -lgsl
+GFLAGS:= -lxdp -lbpf -lgsl -lm
 
 all: flowradar.o flowradar
 

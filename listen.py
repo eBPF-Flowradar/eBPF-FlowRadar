@@ -1,6 +1,7 @@
 from scapy.all import sniff
 from ipaddress import ip_address
 import struct
+from time import time
 
 
 
@@ -9,6 +10,7 @@ TCP="TCP"
 UDP="UDP"
 IPPROTO_TCP=6
 IPPROTO_UDP=17
+LOG_FILE="sniff.csv"
 
 #format_string='<IIHHB'
 format_string='<BHHII'
@@ -34,8 +36,14 @@ def packet_callback(packet):
 
         values.reverse()
         raw_bytes=struct.pack(format_string,*values)
+        hex_value=raw_bytes.hex().lstrip('0')  #to match with log from ebpf program
 
-        print(raw_bytes.hex())
+        print(hex_value)
+
+        #write to file
+        with open(LOG_FILE,"a") as file:
+            file.write(f"{int(time())},{hex_value}\n")
+
 #        print(packet.summary())
 
 # Replace 'eth0' with the interface you want to listen on
