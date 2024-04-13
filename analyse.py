@@ -70,18 +70,23 @@ SNIFF_FILE="sniff.csv"
 cd_flows={}
 sniff_flows={}
 
+cd_pkt_count=0
+sniff_pkt_count=0
+
 with open(CD_FILE) as file:
     for line in file:
         _,flow_id,pkt_count=line.strip().split(',')
         cd_flows[flow_id]=cd_flows.get(flow_id,0)+int(pkt_count)  
+        cd_pkt_count+=int(pkt_count)
 
 with open(SNIFF_FILE) as file:
     for line in file:
         _,flow_id=line.strip().split(',')
         sniff_flows[flow_id]=sniff_flows.get(flow_id,0)+1
+        sniff_pkt_count+=1
 
-#print(cd_flows)
-#print(sniff_flows)
+print(f"Counter Decode Pkt Count: {cd_pkt_count}")
+print(f"Sniff Pkt Count: {sniff_pkt_count}\n")
 
 if cd_flows==sniff_flows:
     print("Equal")
@@ -104,10 +109,3 @@ else:
         print(f"cd_flows:{differences[DIFF_VALUES][flow][0]}")
         print(f"sniff_flows:{differences[DIFF_VALUES][flow][1]}")
         print()
-
-
-
-
-
-
-
