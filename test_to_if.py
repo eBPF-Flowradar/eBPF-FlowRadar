@@ -4,7 +4,7 @@ from scapy.all import PcapReader,sendp,Ether
 pcap_file = "./110k_24k_caida.pcap"
 packets = PcapReader(pcap_file)
 
-#num_packets=0
+num_packets=0
 
 IP="IP"
 TCP="TCP"
@@ -21,11 +21,11 @@ ethernet_header=Ether(dst="ff:ff:ff:ff:ff:ff", src="00:11:22:33:44:55", type=0x0
 print("Starting to send packets")
 for packet in packets:
 
-#    if num_packets==10:
-#        break
+    if num_packets==100:
+        break
 
     if IP in packet and (TCP in packet or UDP in packet):
         packet=ethernet_header/packet
-        #print(packet.summary())
+        print(packet.summary())
         sendp(packet, iface=interface)
-#
+        num_packets+=1

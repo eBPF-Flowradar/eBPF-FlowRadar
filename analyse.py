@@ -1,3 +1,46 @@
+from ipaddress import ip_address
+import struct
+
+TCP="TCP"
+UDP="UDP"
+IPPROTO_TCP=6
+IPPROTO_UDP=17
+
+format_string='<BHHII'
+
+
+
+def decode(flow_string:str):
+
+    flow_bytes=bytes.fromhex(flow_string.rjust(26,"0"))
+    flow={}
+
+    protocol,dest_port,src_port,dest_ip,src_ip=struct.unpack(format_string,flow_bytes)
+
+    flow["src_ip"]=str(ip_address(src_ip))
+    flow["dest_ip"]=str(ip_address(dest_ip))
+
+
+    flow["src_port"]=src_port
+    flow["dest_port"]=dest_port
+
+    if protocol==IPPROTO_TCP:
+        flow["protocol"]=TCP
+    elif protocol==IPPROTO_UDP:
+        flow["protocol"]=UDP
+    else:
+        flow["protocol"]="unknown"
+
+    return flow
+
+
+CD_FLOWS_KEY='Keys only in cd_flows'
+SNF_FLOWS_KEY='Keys only in sniff_flows'
+DIFF_VALUES='Different values'
+
+
+
+
 def dict_differences(dict1, dict2):
     # Keys in dict1 but not in dict2
     keys_only_in_dict1 = dict1.keys() - dict2.keys()
@@ -11,9 +54,9 @@ def dict_differences(dict1, dict2):
 
     # Summary of differences
     differences = {
-        'Keys only in first dict (cd_flows)': keys_only_in_dict1,
-        'Keys only in second dict (sniff_flows)': keys_only_in_dict2,
-        'Different values': different_values
+        CD_FLOWS_KEY: keys_only_in_dict1,
+        SNF_FLOWS_KEY: keys_only_in_dict2,
+        DIFF_VALUES: different_values
     }
 
     return differences
@@ -43,4 +86,28 @@ with open(SNIFF_FILE) as file:
 if cd_flows==sniff_flows:
     print("Equal")
 else:
-    print(dict_differences(cd_flows,sniff_flows))
+    differences=dict_differences(cd_flows,sniff_flows)
+
+    print(CD_FLOWS_KEY)
+    for flow in differences[CD_FLOWS_KEY]: 
+        print(f"{flow} {decode(flow)}")
+    print()
+
+    print(SNF_FLOWS_KEY)
+    for flow in differences[SNF_FLOWS_KEY]: 
+        print(f"{flow} {decode(flow)}")
+    print()
+
+    print(DIFF_VALUES)
+    for flow in differences[DIFF_VALUES]:
+        print(f"{flow} {decode(flow)}")
+        print(f"cd_flows:{differences[DIFF_VALUES][flow][0]}")
+        print(f"sniff_flows:{differences[DIFF_VALUES][flow][1]}")
+        print()
+
+
+
+
+
+
+
