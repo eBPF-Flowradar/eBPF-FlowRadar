@@ -4,3 +4,4 @@
 flowradar
 *.pcap
 venv/
+results/

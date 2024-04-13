@@ -5,6 +5,8 @@
 4. XDP can only capture packets from RX (incoming side). Is that a problem ?
 5. See #Notes 1
 6. Ask about hashes are implemented for consistent implementation with theirs
+7. Extra metadata to be stored?  (e.g., packet counters, and the flow starting and finish times).
+8. When should we clear the flowset? In the simulation its done in sequential order?
 
 # Check
 1. Check all TODOs
