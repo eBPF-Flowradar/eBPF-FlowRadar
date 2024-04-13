@@ -29,6 +29,9 @@
 3. delay before start_decode function [x]
 4. Unload the XDP program on error
 5. Continue the loop if counting table empty in start_decode [x]
+6. Replace the bpf maps with support for locks
+    - [lwn article on BPF spinlocks](https://lwn.net/Articles/779120/)
+    -[text](https://lwn.net/ml/netdev/20190131234012.3712779-10-ast@kernel.org/)
 
 # Errors
 1. Errors due to empty flowsets being passed down to gsl [x]
