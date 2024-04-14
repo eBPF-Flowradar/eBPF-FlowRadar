@@ -97,7 +97,8 @@ static void start_decode(int ct_fd_0,int ff_fd_0,int ct_fd_1,int ff_fd_1,int flo
 
     current.val = !current.val;
 
-    bpf_map_update_elem(flowset_id_fd, &first, &current, BPF_EXIST);
+    bpf_map_update_elem(flowset_id_fd, &first, &current, BPF_F_LOCK);
+    
     // if(ret<0){
     //   return ret;
     // }

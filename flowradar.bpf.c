@@ -276,14 +276,20 @@ int xdp_parse_flow(struct xdp_md *ctx) {
   bool old_flow = false;
 
   //Get the ID of the flowset to which the flow should be inserted
+  
   int temp=0;
+  
   struct FlowSetIDWithLocks * flowset_id_ptr = bpf_map_lookup_elem(&Flowset_ID, &temp);
+  
   bool flowset_id;
-
+  bool locked = false;
+  
   if(flowset_id_ptr){
+  
      bpf_spin_lock(&flowset_id_ptr->lock);
      flowset_id = flowset_id_ptr->val;
-     bpf_spin_unlock(&flowset_id_ptr->lock);
+     locked = true;
+  
   }else{
     //if flowset_id not initialized start from 0
     flowset_id=false;
@@ -291,13 +297,20 @@ int xdp_parse_flow(struct xdp_md *ctx) {
 
   //checking whether old flow and insert if its not
   if (query_flow_filter(nflow,flowset_id)) {
+  
     old_flow = true;
+  
   } else {
+  
     insert_to_flow_filter(nflow,flowset_id);
+  
   }
 
   insert_flow_to_counting_table(nflow, old_flow,flowset_id);
-
+  
+  if(locked)
+      bpf_spin_unlock(&flowset_id_ptr->lock);
+  
   return XDP_PASS;
 }
 
