@@ -17,6 +17,11 @@ static int ifindex;
 struct xdp_program *prog = NULL;
 int first=0; //used for accessing the only element in flowset_id
 
+//relying on automatic init by compiler TODO:Verify this
+// bool empty_flowfilter[FLOW_FILTER_SIZE]={false};
+// struct counting_table_entry empty_counting_table[COUNTING_TABLE_SIZE];
+//relying on automatic init by compiler TODO:Verify this
+struct flowset empty_flowset;
 
 
 static void int_exit(int sig) {
@@ -26,26 +31,31 @@ static void int_exit(int sig) {
 }
 
 
-static void initialize_flow_filter(int flow_filter_file_descriptor) {
+// static void initialize_flow_filter(int flow_filter_file_descriptor) {
 
-  for (int i = 0; i < FLOW_FILTER_SIZE; ++i) {
-    bool set = false;
-    bpf_map_update_elem(flow_filter_file_descriptor, &i, &set, BPF_ANY);
-  }
+//   for (int i = 0; i < FLOW_FILTER_SIZE; ++i) {
+//     bool set = false;
+//     bpf_map_update_elem(flow_filter_file_descriptor, &i, &set, BPF_ANY);
+//   }
+// }
+
+// static void initialize_counting_table(int counting_table_file_desc) {
+
+//   for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
+//     struct counting_table_entry entry = {
+//         .flowXOR = 0, .flowCount = 0, .packetCount = 0};
+//     bpf_map_update_elem(counting_table_file_desc, &i, &entry, BPF_ANY);
+//   }
+// }
+
+static void initialize_flowset(int flowset_fd){
+
+  bpf_map_update_elem(flowset_fd,&first,&empty_flowset,BPF_ANY);
+
 }
 
-static void initialize_counting_table(int counting_table_file_desc) {
 
-  for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
-    struct counting_table_entry entry = {
-        .flowXOR = 0, .flowCount = 0, .packetCount = 0};
-    bpf_map_update_elem(counting_table_file_desc, &i, &entry, BPF_ANY);
-  }
-}
-
-
-
-static void start_decode(int ct_fd_0,int ff_fd_0,int ct_fd_1,int ff_fd_1,int flowset_id_fd) {
+static void start_decode(int flowset_fd_0,int flowset_fd_1,int flowset_id_fd) {
 
   int loop = 0;
 
@@ -60,57 +70,74 @@ static void start_decode(int ct_fd_0,int ff_fd_0,int ct_fd_1,int ff_fd_1,int flo
 
     loop++;
     printf("\nPoll No : %d\n", loop);
-    printf("FlowXOR ,FlowCount ,PacketCount\n");
+    
 
     struct flowset flow_set;
     __u32 pktCount[COUNTING_TABLE_SIZE];
 
     //Get map currently in use
-    bool current;
-    int counting_table_fd,flow_filter_fd;
+    struct flowset_id_struct current;
+    int curr_flowset_fd;
     bpf_map_lookup_elem(flowset_id_fd, &first, &current);
     // if(ret<0){
     //   return ret;
     // }
-    if(current){
-      counting_table_fd=ct_fd_1;
-      flow_filter_fd=ff_fd_1;
+    if(current.id){
+      // counting_table_fd=ct_fd_1;
+      // flow_filter_fd=ff_fd_1;
+      curr_flowset_fd=flowset_fd_1;
       printf("Flowset 1 in use\n");
     }else{
-      counting_table_fd=ct_fd_0;
-      flow_filter_fd=ff_fd_0;
+      curr_flowset_fd=flowset_fd_0;
       printf("Flowset 0 in use\n");
     }
   
     //invert Flowset_ID
-    bool set=!current;
-    bpf_map_update_elem(flowset_id_fd, &first, &set, BPF_EXIST);
+    current.id=!(current.id);
+    //wait till lock release
+    bpf_map_update_elem(flowset_id_fd, &first, &current, BPF_F_LOCK);
     // if(ret<0){
     //   return ret;
     // }
 
+    bpf_map_lookup_elem(curr_flowset_fd,&first,&flow_set);
 
+    printf("FlowXOR ,FlowCount ,PacketCount\n");
+    for(int i=0;i<COUNTING_TABLE_SIZE;i++){
 
+      struct counting_table_entry cte=flow_set.counting_table[i];
+      pktCount[i]=cte.packetCount;
 
-
-    //TODO: check for more efficient ways of copying maps to userspace
-    //DONE: Using two flowsets
-    for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
-      struct counting_table_entry cte;
-      int ret = bpf_map_lookup_elem(counting_table_fd, &i, &cte);
-      //TODO: could this be more efficient?
-      if (ret == 0) {
-        flow_set.counting_table[i] = cte;
-        pktCount[i]=cte.packetCount;
-      }
-      if (cte.flowXOR) {
-        ct_empty=false;
+      if(cte.flowXOR){
+         ct_empty=false;
         printf("%" PRIx64 "%016" PRIx64, (uint64_t)(cte.flowXOR >> 64),
               (uint64_t)cte.flowXOR);
         printf(" ,%d ,%d\n", cte.flowCount, cte.packetCount);
-      // printf("%x ,%d ,%d\n", cte.flowXOR, cte.flowCount, cte.packetCount);
       }
+
     }
+
+
+
+    //old
+    //TODO: check for more efficient ways of copying maps to userspace
+    //DONE: Using two flowsets
+    // for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
+    //   struct counting_table_entry cte;
+    //   int ret = bpf_map_lookup_elem(counting_table_fd, &i, &cte);
+    //   //TODO: could this be more efficient?
+    //   if (ret == 0) {
+    //     flow_set.counting_table[i] = cte;
+    //     pktCount[i]=cte.packetCount;
+    //   }
+    //   if (cte.flowXOR) {
+    //     ct_empty=false;
+    //     printf("%" PRIx64 "%016" PRIx64, (uint64_t)(cte.flowXOR >> 64),
+    //           (uint64_t)cte.flowXOR);
+    //     printf(" ,%d ,%d\n", cte.flowCount, cte.packetCount);
+    //   // printf("%x ,%d ,%d\n", cte.flowXOR, cte.flowCount, cte.packetCount);
+    //   }
+    // }
 
     //Continue the loop if counting table is empty
     if(ct_empty){
@@ -121,8 +148,9 @@ static void start_decode(int ct_fd_0,int ff_fd_0,int ct_fd_1,int ff_fd_1,int flo
 
     //reset the flowset 
     //TODO : better way to do this?
-    initialize_flow_filter(flow_filter_fd);
-    initialize_counting_table(counting_table_fd);
+    // initialize_flow_filter(flow_filter_fd);
+    // initialize_counting_table(counting_table_fd);
+    initialize_flowset(curr_flowset_fd);
 
 
     //perform single decode and print the purecells
@@ -192,15 +220,28 @@ int main(int argc, char *argv[]) {
 
   bpf_obj = xdp_program__bpf_obj(prog);
 
-  int Counting_table_fd_0 =
-      bpf_object__find_map_fd_by_name(bpf_obj, "Counting_table_0");
-  int Flow_filter_fd_0 = bpf_object__find_map_fd_by_name(bpf_obj, "Flow_filter_0");
-  int Counting_table_fd_1 =
-      bpf_object__find_map_fd_by_name(bpf_obj, "Counting_table_1");
-  int Flow_filter_fd_1 = bpf_object__find_map_fd_by_name(bpf_obj, "Flow_filter_1");
+  // int Counting_table_fd_0 =
+  //     bpf_object__find_map_fd_by_name(bpf_obj, "Counting_table_0");
+  // int Flow_filter_fd_0 = bpf_object__find_map_fd_by_name(bpf_obj, "Flow_filter_0");
+  // int Counting_table_fd_1 =
+  //     bpf_object__find_map_fd_by_name(bpf_obj, "Counting_table_1");
+  // int Flow_filter_fd_1 = bpf_object__find_map_fd_by_name(bpf_obj, "Flow_filter_1");
+
+  int Flowset_fd_0=bpf_object__find_map_fd_by_name(bpf_obj, "Flow_set_0");
+  int Flowset_fd_1=bpf_object__find_map_fd_by_name(bpf_obj, "Flow_set_1");
 
 
   int Flowset_id_fd=bpf_object__find_map_fd_by_name(bpf_obj, "Flowset_ID");
+
+
+
+  // initialize_flow_filter(Flow_filter_fd_0);
+  // initialize_counting_table(Counting_table_fd_0);
+  // initialize_flow_filter(Flow_filter_fd_1);
+  // initialize_counting_table(Counting_table_fd_1);
+
+  initialize_flowset(Flowset_fd_0);
+  initialize_flowset(Flowset_fd_1);
 
   //initialize Flowset_ID
   bool set=false;
@@ -209,12 +250,8 @@ int main(int argc, char *argv[]) {
   //   return ret;
   // }
 
-  initialize_flow_filter(Flow_filter_fd_0);
-  initialize_counting_table(Counting_table_fd_0);
-  initialize_flow_filter(Flow_filter_fd_1);
-  initialize_counting_table(Counting_table_fd_1);
-
-  start_decode(Counting_table_fd_0,Flow_filter_fd_0,Counting_table_fd_1,Flow_filter_fd_1,Flowset_id_fd);
+  //from here
+  start_decode(Flowset_fd_0,Flowset_fd_1,Flowset_id_fd);
 
   int_exit(0);
   return 0;

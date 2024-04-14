@@ -3,8 +3,10 @@
 #define FLOW_RADAR_H
 
 #include <linux/types.h>
+#include <stdbool.h>
+#include <linux/bpf.h>   //don't know whether its good to include it here
 
-#define FLOW_FILTER_SIZE 240000
+#define FLOW_FILTER_SIZE  245000 //244999 // FLOWFILTER_HASH_COUNT*BITS_PER_SLICE
 #define COUNTING_TABLE_SIZE 30000
 #define MAX_PURE_CELLS COUNTING_TABLE_SIZE * 2
 // #define NUM_HASH_FUNCTIONS 5
@@ -34,6 +36,12 @@ struct counting_table_entry {
 
 struct flowset {
   struct counting_table_entry counting_table[COUNTING_TABLE_SIZE];
+  bool flow_filter[FLOW_FILTER_SIZE];
+};
+
+struct flowset_id_struct{
+  struct bpf_spin_lock lock;
+  bool id;
 };
 
 struct network_flow {

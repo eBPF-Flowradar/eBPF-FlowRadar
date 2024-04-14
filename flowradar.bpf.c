@@ -33,47 +33,63 @@
 struct {
   __uint(type, BPF_MAP_TYPE_ARRAY);
   __type(key, int);
-  __type(value, bool);
+  __type(value, struct flowset_id_struct);
   __uint(max_entries, 1);
 } Flowset_ID SEC(".maps");
 
 
-// Define the Counting Table 0
+// // Define the Counting Table 0
+// struct {
+//   __uint(type, BPF_MAP_TYPE_ARRAY);
+//   __type(key, int);
+//   __type(value, struct counting_table_entry);
+//   __uint(max_entries, COUNTING_TABLE_SIZE);
+// } Counting_table_0 SEC(".maps");
+
+// //Define the flow filter 0
+// struct {
+//   __uint(type, BPF_MAP_TYPE_ARRAY);
+//   __type(key, int);
+//   __type(value, bool);
+//   __uint(max_entries, FLOW_FILTER_SIZE);
+// } Flow_filter_0 SEC(".maps");
+
+
+// // Define the Counting Table 1
+// struct {
+//   __uint(type, BPF_MAP_TYPE_ARRAY);
+//   __type(key, int);
+//   __type(value, struct counting_table_entry);
+//   __uint(max_entries, COUNTING_TABLE_SIZE);
+// } Counting_table_1 SEC(".maps");
+
+// //Define the flow filter 1
+// struct {
+//   __uint(type, BPF_MAP_TYPE_ARRAY);
+//   __type(key, int);
+//   __type(value, bool);
+//   __uint(max_entries, FLOW_FILTER_SIZE);
+// } Flow_filter_1 SEC(".maps");
+
+//Define Flow Set 0
 struct {
   __uint(type, BPF_MAP_TYPE_ARRAY);
   __type(key, int);
-  __type(value, struct counting_table_entry);
-  __uint(max_entries, COUNTING_TABLE_SIZE);
-} Counting_table_0 SEC(".maps");
+  __type(value, struct flowset);
+  __uint(max_entries, 1);
+} Flow_set_0 SEC(".maps");
 
-//Define the flow filter 0
+//Define Flow Set 1
 struct {
   __uint(type, BPF_MAP_TYPE_ARRAY);
   __type(key, int);
-  __type(value, bool);
-  __uint(max_entries, FLOW_FILTER_SIZE);
-} Flow_filter_0 SEC(".maps");
-
-
-// Define the Counting Table 1
-struct {
-  __uint(type, BPF_MAP_TYPE_ARRAY);
-  __type(key, int);
-  __type(value, struct counting_table_entry);
-  __uint(max_entries, COUNTING_TABLE_SIZE);
-} Counting_table_1 SEC(".maps");
-
-//Define the flow filter 1
-struct {
-  __uint(type, BPF_MAP_TYPE_ARRAY);
-  __type(key, int);
-  __type(value, bool);
-  __uint(max_entries, FLOW_FILTER_SIZE);
-} Flow_filter_1 SEC(".maps");
+  __type(value, struct flowset);
+  __uint(max_entries, 1);
+} Flow_set_1 SEC(".maps");
 
 
 
-static __always_inline int insert_to_flow_filter(struct network_flow flow,bool flowset_id) {
+static __always_inline int insert_to_flow_filter(struct network_flow flow,struct flowset *curr_flowset) {
 
   __u128 flow_key = 0;
   memcpy(&flow_key, &flow, sizeof(struct network_flow));
@@ -81,42 +97,48 @@ static __always_inline int insert_to_flow_filter(struct network_flow flow,bool f
   for (int i = 0; i < FLOW_FILTER_HASH_COUNT; ++i) {
     int offset = murmurhash(flow_key, i) % BITS_PER_SLICE;
     int hashIndex = i * BITS_PER_SLICE + offset;
-    bool bit = true;
-    if(flowset_id){
-      bpf_map_update_elem(&Flow_filter_1, &hashIndex, &bit, BPF_ANY);
-    }else{
-      bpf_map_update_elem(&Flow_filter_0, &hashIndex, &bit, BPF_ANY);
-    }
+    // bool bit = true;
+    // if(flowset_id){
+    //   bpf_map_update_elem(&Flow_filter_1, &hashIndex, &bit, BPF_ANY);
+    // }else{
+    //   bpf_map_update_elem(&Flow_filter_0, &hashIndex, &bit, BPF_ANY);
+    // }
+    curr_flowset->flow_filter[hashIndex]=true;
   }
 
   return 0;
 }
 
-static __always_inline bool query_flow_filter(struct network_flow flow,bool flowset_id) {
+static __always_inline bool query_flow_filter(struct network_flow flow,struct flowset *curr_flowset) {
 
-  __u128 flow_key = 0;
+
+__u128 flow_key = 0;
   memcpy(&flow_key, &flow, sizeof(struct network_flow));
 
-  for (int i = 0; i < FLOW_FILTER_HASH_COUNT; ++i) {
+  for (int i = 0; i < FLOW_FILTER_HASH_COUNT; i++) {
     int offset = murmurhash(flow_key, i) % BITS_PER_SLICE;
     int hashIndex = i * BITS_PER_SLICE + offset;
-    bool *set;
-    if(flowset_id){
-      set = bpf_map_lookup_elem(&Flow_filter_1, &hashIndex);
-    }else{
-      set = bpf_map_lookup_elem(&Flow_filter_0, &hashIndex);
+    // bool *set;
+    // if(flowset_id){
+    //   set = bpf_map_lookup_elem(&Flow_filter_1, &hashIndex);
+    // }else{
+    //   set = bpf_map_lookup_elem(&Flow_filter_0, &hashIndex);
+    // }
+    if(hashIndex<FLOW_FILTER_SIZE && curr_flowset->flow_filter[hashIndex]==false){
+      return false;
     }
-    if (set) {
-      if (*set == false) {
-        return false;
-      }
-    }
+
+    // if (set) {
+    //   if (*set == false) {
+    //     return false;
+    //   }
+    // }
   }
   return true;
 }
 
 static __always_inline int
-insert_flow_to_counting_table(struct network_flow flow, bool old_flow,bool flowset_id) {
+insert_flow_to_counting_table(struct network_flow flow, bool old_flow,struct flowset *curr_flowset) {
 
   //int num_buckets = COUNTING_TABLE_HASH_COUNT;
 
@@ -127,37 +149,53 @@ insert_flow_to_counting_table(struct network_flow flow, bool old_flow,bool flows
 
     __u32 j = i;
 
-    struct counting_table_entry *ct = NULL;
-    struct counting_table_entry cte;
+    // struct counting_table_entry *ct = NULL;
+    // struct counting_table_entry cte;
 
-    int bucket_index = jhash_flow(flow, j) % COUNTING_TABLE_SIZE;
+    int index = jhash_flow(flow, j) % COUNTING_TABLE_SIZE;
     // Hash Value % BUCKET_SIZE 7500;
 
-    if(flowset_id){
-        ct = bpf_map_lookup_elem(&Counting_table_1, &bucket_index);
-    }else{
-        ct = bpf_map_lookup_elem(&Counting_table_0, &bucket_index);
-    }
+    // if(flowset_id){
+    //     ct = bpf_map_lookup_elem(&Counting_table_1, &bucket_index);
+    // }else{
+    //     ct = bpf_map_lookup_elem(&Counting_table_0, &bucket_index);
+    // }
 
-    if(ct){
-      cte=*ct;
-    }else{
-      return -1;
-    }
+    // if(ct){
+    //   cte=*ct;
+    // }else{
+    //   return -1;
+    // }
+
+    struct counting_table_entry cte=curr_flowset->counting_table[index];
 
     if(old_flow){
-      cte.packetCount++; 
+      cte.packetCount++;
     }else{
       cte.flowXOR ^= flowKey;
       cte.packetCount++;
       cte.flowCount++;
     }
+    
+    curr_flowset->counting_table[index]=cte;
+    
+    // if(old_flow){
+    //   //cte->packetCount++;
+    //   curr_flowset->counting_table[index].packetCount++;
+    // }else{
+    //   cte->flowXOR ^= flowKey;
+    //   // cte->packetCount++;
+    //   curr_flowset->counting_table[index].packetCount++;
+    //   cte->flowCount++;
+    // }
 
-    if(flowset_id){
-      bpf_map_update_elem(&Counting_table_1, &bucket_index, &cte, BPF_EXIST);
-    }else{
-      bpf_map_update_elem(&Counting_table_0, &bucket_index, &cte, BPF_EXIST);
-    }
+
+
+    // if(flowset_id){
+    //   bpf_map_update_elem(&Counting_table_1, &bucket_index, &cte, BPF_EXIST);
+    // }else{
+    //   bpf_map_update_elem(&Counting_table_0, &bucket_index, &cte, BPF_EXIST);
+    // }
 
 
     // if (old_flow == true) {
@@ -274,27 +312,48 @@ int xdp_parse_flow(struct xdp_md *ctx) {
   bool old_flow = false;
 
   //Get the ID of the flowset to which the flow should be inserted
-  int temp=0;
-  bool *flowset_id_ptr = bpf_map_lookup_elem(&Flowset_ID, &temp);
-  bool flowset_id;
-
+  int first=0;
+  struct flowset_id_struct *flowset_id_ptr = bpf_map_lookup_elem(&Flowset_ID, &first);
+  struct flowset *flowset_0=bpf_map_lookup_elem(&Flow_set_0,&first);
+  struct flowset *flowset_1=bpf_map_lookup_elem(&Flow_set_1,&first);
+  
+  //start only when flowset_id initialized
   if(flowset_id_ptr){
-    flowset_id=*flowset_id_ptr;
-  }else{
-    //if flowset_id not initialized start from 0
-    flowset_id=false;
+
+    bpf_spin_lock(&flowset_id_ptr->lock);
+
+    bool flowset_id=flowset_id_ptr->id;
+    struct flowset *curr_flowset=NULL;
+
+
+    if(flowset_id){
+      curr_flowset=flowset_1;
+    }else{
+      curr_flowset=flowset_0;
+    }
+    
+    
+    if(curr_flowset){
+
+      //take lock and use pointers to update
+      // bpf_spin_lock(&curr_flowset->lock);
+      
+      //checking whether old flow and insert if its not
+      if (query_flow_filter(nflow,curr_flowset)) {
+        old_flow = true;
+      } else {
+        insert_to_flow_filter(nflow,curr_flowset);
+      }
+
+      insert_flow_to_counting_table(nflow, old_flow,curr_flowset);
+
+      // bpf_spin_unlock(&curr_flowset->lock);
+    }
+
+    bpf_spin_unlock(&flowset_id_ptr->lock);
+
   }
 
-
-
-  //checking whether old flow and insert if its not
-  if (query_flow_filter(nflow,flowset_id)) {
-    old_flow = true;
-  } else {
-    insert_to_flow_filter(nflow,flowset_id);
-  }
-
-  insert_flow_to_counting_table(nflow, old_flow,flowset_id);
 
   return XDP_PASS;
 }
