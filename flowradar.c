@@ -28,7 +28,7 @@ static void int_exit(int sig) {
 
 static void initialize_flow_filter(int flow_filter_file_descriptor) {
 
-  for (int i = 0; i < BLOOM_FILTER_SIZE; ++i) {
+  for (int i = 0; i < FLOW_FILTER_SIZE; ++i) {
     bool set = false;
     bpf_map_update_elem(flow_filter_file_descriptor, &i, &set, BPF_ANY);
   }

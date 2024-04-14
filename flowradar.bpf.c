@@ -51,7 +51,7 @@ struct {
   __uint(type, BPF_MAP_TYPE_ARRAY);
   __type(key, int);
   __type(value, bool);
-  __uint(max_entries, BLOOM_FILTER_SIZE);
+  __uint(max_entries, FLOW_FILTER_SIZE);
 } Flow_filter_0 SEC(".maps");
 
 
@@ -68,7 +68,7 @@ struct {
   __uint(type, BPF_MAP_TYPE_ARRAY);
   __type(key, int);
   __type(value, bool);
-  __uint(max_entries, BLOOM_FILTER_SIZE);
+  __uint(max_entries, FLOW_FILTER_SIZE);
 } Flow_filter_1 SEC(".maps");
 
 
