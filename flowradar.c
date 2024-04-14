@@ -1,5 +1,6 @@
 #include "counter_decode.c"
 #include "single_decode.c"
+#include "concurrency.h"
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 #include <inttypes.h>
@@ -66,32 +67,40 @@ static void start_decode(int ct_fd_0,int ff_fd_0,int ct_fd_1,int ff_fd_1,int flo
     __u32 pktCount[COUNTING_TABLE_SIZE];
 
     //Get map currently in use
-    bool current;
-    int counting_table_fd,flow_filter_fd;
+    
+    struct FlowSetIDWithLocks current;
+    
+    int counting_table_fd, flow_filter_fd;
+
     bpf_map_lookup_elem(flowset_id_fd, &first, &current);
+    
     // if(ret<0){
     //   return ret;
     // }
-    if(current){
+    
+    if(current.val){
+    
       counting_table_fd=ct_fd_1;
       flow_filter_fd=ff_fd_1;
       printf("Flowset 1 in use\n");
-    }else{
+    
+    }
+    else{
+    
       counting_table_fd=ct_fd_0;
       flow_filter_fd=ff_fd_0;
       printf("Flowset 0 in use\n");
+    
     }
   
     //invert Flowset_ID
-    bool set=!current;
-    bpf_map_update_elem(flowset_id_fd, &first, &set, BPF_EXIST);
+
+    current.val = !current.val;
+
+    bpf_map_update_elem(flowset_id_fd, &first, &current, BPF_EXIST);
     // if(ret<0){
     //   return ret;
     // }
-
-
-
-
 
     //TODO: check for more efficient ways of copying maps to userspace
     //DONE: Using two flowsets

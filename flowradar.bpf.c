@@ -1,4 +1,5 @@
 #include "hashutils.h"
+#include "concurrency.h"
 #include <arpa/inet.h>
 #include <bpf/bpf_helpers.h>
 #include <linux/bpf.h>
@@ -30,10 +31,11 @@
 //} bloom_filter SEC(".maps");
 
 //Stucture to decide which flowset should be used
+
 struct {
   __uint(type, BPF_MAP_TYPE_ARRAY);
   __type(key, int);
-  __type(value, bool);
+  __type(value, struct FlowSetIDWithLocks);
   __uint(max_entries, 1);
 } Flowset_ID SEC(".maps");
 
@@ -275,17 +277,17 @@ int xdp_parse_flow(struct xdp_md *ctx) {
 
   //Get the ID of the flowset to which the flow should be inserted
   int temp=0;
-  bool *flowset_id_ptr = bpf_map_lookup_elem(&Flowset_ID, &temp);
+  struct FlowSetIDWithLocks * flowset_id_ptr = bpf_map_lookup_elem(&Flowset_ID, &temp);
   bool flowset_id;
 
   if(flowset_id_ptr){
-    flowset_id=*flowset_id_ptr;
+     bpf_spin_lock(&flowset_id_ptr->lock);
+     flowset_id = flowset_id_ptr->val;
+     bpf_spin_unlock(&flowset_id_ptr->lock);
   }else{
     //if flowset_id not initialized start from 0
     flowset_id=false;
   }
-
-
 
   //checking whether old flow and insert if its not
   if (query_flow_filter(nflow,flowset_id)) {
