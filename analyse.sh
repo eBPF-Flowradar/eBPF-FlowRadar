@@ -16,5 +16,5 @@ mkdir "$timestamp"
 # Move the files to the new directory
 mv "cd_logs.csv" "sniff.csv" "analysis.txt" "./$timestamp/"
 
-echo "\nFiles moved to directory: $timestamp"
+echo -e "\nFiles moved to directory: $timestamp"
 
