@@ -121,7 +121,7 @@ static inline __u32 murmurhash(__u128 key, __u32 seed) {
     k = (k << 15) | (k >> 17);
     k *= 0x1b873593;
     hash ^= k;
-    hash = (hash << 13) | (hash >> 19);
+    hash =(hash << 13)| (hash >> 19); //problematic
     hash = hash * 5 + 0xe6546b64;
   }
 

@@ -1,4 +1,6 @@
-#include "hashutils.h"
+// #include "hashutils.h"
+#include "flowradar.h"
+#include "murmur.h"
 #include <arpa/inet.h>
 #include <bpf/bpf_helpers.h>
 #include <linux/bpf.h>
@@ -95,14 +97,20 @@ static __always_inline int insert_to_flow_filter(struct network_flow flow,struct
   memcpy(&flow_key, &flow, sizeof(struct network_flow));
   // flow key generator function
   for (int i = 0; i < FLOW_FILTER_HASH_COUNT; ++i) {
-    int offset = murmurhash(flow_key, i) % BITS_PER_SLICE;
-    int hashIndex = i * BITS_PER_SLICE + offset;
+    // int offset = murmurhash(flow_key, i) % BITS_PER_SLICE;
+    __u32 offset;
+    MurmurHash3_x86_32(&flow_key,16,i,&offset);
+    offset=offset%FLOW_FILTER_BITS_PER_SLICE;
+    __u32 hashIndex = i * FLOW_FILTER_BITS_PER_SLICE + offset;
     // bool bit = true;
     // if(flowset_id){
     //   bpf_map_update_elem(&Flow_filter_1, &hashIndex, &bit, BPF_ANY);
     // }else{
     //   bpf_map_update_elem(&Flow_filter_0, &hashIndex, &bit, BPF_ANY);
     // }
+    if(hashIndex>=FLOW_FILTER_SIZE){
+      return -1;
+    }
     curr_flowset->flow_filter[hashIndex]=true;
   }
 
@@ -116,16 +124,25 @@ __u128 flow_key = 0;
   memcpy(&flow_key, &flow, sizeof(struct network_flow));
 
   for (int i = 0; i < FLOW_FILTER_HASH_COUNT; i++) {
-    int offset = murmurhash(flow_key, i) % BITS_PER_SLICE;
-    int hashIndex = i * BITS_PER_SLICE + offset;
+    __u32 offset;
+    MurmurHash3_x86_32(&flow_key,16,i,&offset);
+    offset=offset%FLOW_FILTER_BITS_PER_SLICE;
+    // __u32 offset = murmurhash(flow_key, i) % BITS_PER_SLICE;
+    __u32 hashIndex = i * FLOW_FILTER_BITS_PER_SLICE + offset;
     // bool *set;
     // if(flowset_id){
     //   set = bpf_map_lookup_elem(&Flow_filter_1, &hashIndex);
     // }else{
     //   set = bpf_map_lookup_elem(&Flow_filter_0, &hashIndex);
     // }
-    if(hashIndex<FLOW_FILTER_SIZE && curr_flowset->flow_filter[hashIndex]==false){
-      return false;
+
+    if(hashIndex>=FLOW_FILTER_SIZE){
+      return -1;
+    }
+
+
+    if(curr_flowset->flow_filter[hashIndex]==false){
+      return false;  //new flow
     }
 
     // if (set) {
@@ -134,7 +151,7 @@ __u128 flow_key = 0;
     //   }
     // }
   }
-  return true;
+  return true; //old flow
 }
 
 static __always_inline int
@@ -142,19 +159,30 @@ insert_flow_to_counting_table(struct network_flow flow, bool old_flow,struct flo
 
   //int num_buckets = COUNTING_TABLE_HASH_COUNT;
 
-  __u128 flowKey = 0;
-  memcpy(&flowKey, &flow, sizeof(struct network_flow));
+  __u128 flow_key = 0;
+  memcpy(&flow_key, &flow, sizeof(struct network_flow));
 
   for (int i = 0; i < COUNTING_TABLE_HASH_COUNT; ++i) {
 
-    __u32 j = i;
+    // __u32 j = i;
 
     // struct counting_table_entry *ct = NULL;
     // struct counting_table_entry cte;
 
-    int index = jhash_flow(flow, j) % COUNTING_TABLE_SIZE;
-    // Hash Value % BUCKET_SIZE 7500;
+    // int index = jhash_flow(flow, j) % COUNTING_TABLE_SIZE;
 
+    __u32 offset=0;
+    MurmurHash3_x86_32(&flow_key,16,i,&offset);
+    offset=offset%COUNTING_TABLE_ENTRIES_PER_SLICE;
+    __u32 hashIndex=i*COUNTING_TABLE_ENTRIES_PER_SLICE+offset;
+    // index=index%COUNTING_TABLE_SIZE;
+
+    
+    // index=index%COUNTING_TABLE_SIZE;
+
+
+    // Hash Value % BUCKET_SIZE 7500;
+    
     // if(flowset_id){
     //     ct = bpf_map_lookup_elem(&Counting_table_1, &bucket_index);
     // }else{
@@ -166,18 +194,39 @@ insert_flow_to_counting_table(struct network_flow flow, bool old_flow,struct flo
     // }else{
     //   return -1;
     // }
+    
+    if(hashIndex>=COUNTING_TABLE_SIZE){
 
-    struct counting_table_entry cte=curr_flowset->counting_table[index];
+      return -1;
+
+    }
+
+    struct counting_table_entry cte =curr_flowset->counting_table[hashIndex];
+
 
     if(old_flow){
       cte.packetCount++;
     }else{
-      cte.flowXOR ^= flowKey;
+      cte.flowXOR ^= flow_key;
       cte.packetCount++;
       cte.flowCount++;
     }
     
-    curr_flowset->counting_table[index]=cte;
+    curr_flowset->counting_table[hashIndex]=cte;
+
+     
+
+    // struct counting_table_entry cte=curr_flowset->counting_table[index];
+
+    // if(old_flow){
+    //   cte.packetCount++;
+    // }else{
+    //   cte.flowXOR ^= flow_key;
+    //   cte.packetCount++;
+    //   cte.flowCount++;
+    // }
+    
+    // curr_flowset->counting_table[index]=cte;
     
     // if(old_flow){
     //   //cte->packetCount++;
@@ -318,7 +367,7 @@ int xdp_parse_flow(struct xdp_md *ctx) {
   struct flowset *flowset_1=bpf_map_lookup_elem(&Flow_set_1,&first);
   
   //start only when flowset_id initialized
-  if(flowset_id_ptr){
+  if(flowset_id_ptr && flowset_0 && flowset_1){
 
     bpf_spin_lock(&flowset_id_ptr->lock);
 

@@ -1,4 +1,6 @@
-#include "hashutils.h"
+// #include "hashutils.h"
+#include "murmur.h"
+#include "flowradar.h"
 #include <gsl/gsl_linalg.h>
 #include <gsl/gsl_multifit.h>
 #include <stdio.h>
@@ -125,9 +127,14 @@ int counter_decode(struct pureset pure_set, __u32 pktCount[COUNTING_TABLE_SIZE])
 
     for (int num_hash = 0; num_hash < COUNTING_TABLE_HASH_COUNT; num_hash++) {
 
-      int entry_pos = jhash_key(flow_id, num_hash)%COUNTING_TABLE_SIZE;
+      __u32 offset=0;
+      MurmurHash3_x86_32(&flow_id,16,num_hash,&offset);
+      offset=offset%COUNTING_TABLE_ENTRIES_PER_SLICE;
+      __u32 hashIndex=num_hash*COUNTING_TABLE_ENTRIES_PER_SLICE+offset;
 
-      eq_matrix[entry_pos][j] = 1.0;
+      // int entry_pos = jhash_key(flow_id, num_hash)%COUNTING_TABLE_SIZE;
+
+      eq_matrix[hashIndex][j] = 1.0;
     }
   }
 

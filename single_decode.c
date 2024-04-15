@@ -1,4 +1,5 @@
-#include "hashutils.h"
+// #include "hashutils.h"
+#include "flowradar.h"
 
 void add(struct pureset *flowSet, __u128 flowXOR) {
 
@@ -49,8 +50,13 @@ void single_decode(struct flowset* A,struct pureset* pure_set) {
       int packetCount = ct_entry.packetCount;
 
       for (int num_hash = 0; num_hash < COUNTING_TABLE_HASH_COUNT; ++num_hash) {
-        __u32 j = num_hash;
-        int hashIndex = jhash_key(flowXOR, j) % COUNTING_TABLE_SIZE;
+        // __u32 j = num_hash;
+        // int hashIndex = jhash_key(flowXOR, j) % COUNTING_TABLE_SIZE;
+        __u32 offset=0;
+        MurmurHash3_x86_32(&flowXOR,16,num_hash,&offset);
+        offset=offset%COUNTING_TABLE_ENTRIES_PER_SLICE;
+        __u32 hashIndex=num_hash*COUNTING_TABLE_ENTRIES_PER_SLICE+offset;
+
         struct counting_table_entry *ct_poses =&(A->counting_table[hashIndex]);
         ct_poses->flowXOR = ct_poses->flowXOR ^ flowXOR;
         ct_poses->flowCount = ct_poses->flowCount - 1;
