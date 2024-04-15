@@ -8,7 +8,11 @@ python3 analyse.py > analysis.txt
 cat analysis.txt
 
 # Create a timestamp
-timestamp="results/$(date +"%Y-%m-%d:%H-%M-%S")"
+if [ $# -eq 0 ]; then
+	timestamp="results/$(date +"%Y-%m-%d:%H-%M-%S")"
+else
+	timestamp="results/$(date +"%Y-%m-%d:%H-%M-%S")_$*"
+fi
 
 # Create a new directory with the timestamp
 mkdir "$timestamp"

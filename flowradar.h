@@ -4,7 +4,7 @@
 
 #include <linux/types.h>
 
-#define FLOW_FILTER_SIZE 240000
+#define FLOW_FILTER_SIZE 245000
 #define COUNTING_TABLE_SIZE 30000
 #define MAX_PURE_CELLS COUNTING_TABLE_SIZE * 2
 // #define NUM_HASH_FUNCTIONS 5
