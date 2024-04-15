@@ -23,6 +23,7 @@
 12. Match number of packets in listener and eBPF program[x]
 13. Packets rounded to nearest integer after calculation (instead of simplifying the calculation)
 14. Check pure set implementation
+15. Proper flow for returning errors.Check return values of bpf helpers and perform required action
 
 # Things Need to be done
 1. Pureset need not be a set as the flows added will be unique always [x]
@@ -45,6 +46,7 @@
 
 # Notes
 1. The 110k_24k_caida.pcap has raw ip packets without the ethernet header, this causes issues with our program as it expects ethernet headers, currently while testing with scapy we are adding the ethernet headers and sending to the interface.
+2. Only supporting IP packets (TCP and UDP)
 
 # Resources to setup veth
 1. Run script.sh

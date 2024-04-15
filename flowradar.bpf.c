@@ -1,4 +1,5 @@
-#include "hashutils.h"
+#include "flowradar.h"
+#include "murmur.h"
 #include <arpa/inet.h>
 #include <bpf/bpf_helpers.h>
 #include <linux/bpf.h>
@@ -13,187 +14,127 @@
 #include <stdio.h>
 #include <string.h>
 
-// #define BLOOM_FILTER_HASH_COUNT 7
-// #define COUNTING_TABLE_HASH_COUNT 4
-// #define NUM_SLICES 7
-// #define BITS_PER_SLICE 35000
-// #define BLOOM_FILTER_SIZE 245000
-// #define COUNTING_TABLE_SIZE 30000
-// #define BUCKET_SIZE 7500
-
-// Define the Bloom Filter
-// struct {
-//  __uint(type, BPF_MAP_TYPE_BLOOM_FILTER);
-//  __type(value, __u128);
-//  __uint(max_entries, BLOOM_FILTER_SIZE);
-//  __uint(map_extra, BLOOM_FILTER_HASH_COUNT);
-//} bloom_filter SEC(".maps");
 
 //Stucture to decide which flowset should be used
 struct {
   __uint(type, BPF_MAP_TYPE_ARRAY);
   __type(key, int);
-  __type(value, bool);
+  __type(value, struct flowset_id_struct);
   __uint(max_entries, 1);
 } Flowset_ID SEC(".maps");
 
 
-// Define the Counting Table 0
+
+
+//Define Flow Set 0
 struct {
   __uint(type, BPF_MAP_TYPE_ARRAY);
   __type(key, int);
-  __type(value, struct counting_table_entry);
-  __uint(max_entries, COUNTING_TABLE_SIZE);
-} Counting_table_0 SEC(".maps");
+  __type(value, struct flowset);
+  __uint(max_entries, 1);
+} Flow_set_0 SEC(".maps");
 
-//Define the flow filter 0
+//Define Flow Set 1
 struct {
   __uint(type, BPF_MAP_TYPE_ARRAY);
   __type(key, int);
-  __type(value, bool);
-  __uint(max_entries, FLOW_FILTER_SIZE);
-} Flow_filter_0 SEC(".maps");
-
-
-// Define the Counting Table 1
-struct {
-  __uint(type, BPF_MAP_TYPE_ARRAY);
-  __type(key, int);
-  __type(value, struct counting_table_entry);
-  __uint(max_entries, COUNTING_TABLE_SIZE);
-} Counting_table_1 SEC(".maps");
-
-//Define the flow filter 1
-struct {
-  __uint(type, BPF_MAP_TYPE_ARRAY);
-  __type(key, int);
-  __type(value, bool);
-  __uint(max_entries, FLOW_FILTER_SIZE);
-} Flow_filter_1 SEC(".maps");
+  __type(value, struct flowset);
+  __uint(max_entries, 1);
+} Flow_set_1 SEC(".maps");
 
 
 
-static __always_inline int insert_to_flow_filter(struct network_flow flow,bool flowset_id) {
+static __always_inline int insert_to_flow_filter(struct network_flow flow,struct flowset *curr_flowset) {
 
-  __u128 flow_key = 0;
-  memcpy(&flow_key, &flow, sizeof(struct network_flow));
-  // flow key generator function
-  for (int i = 0; i < FLOW_FILTER_HASH_COUNT; ++i) {
-    int offset = murmurhash(flow_key, i) % BITS_PER_SLICE;
-    int hashIndex = i * BITS_PER_SLICE + offset;
-    bool bit = true;
-    if(flowset_id){
-      bpf_map_update_elem(&Flow_filter_1, &hashIndex, &bit, BPF_ANY);
-    }else{
-      bpf_map_update_elem(&Flow_filter_0, &hashIndex, &bit, BPF_ANY);
-    }
-  }
-
-  return 0;
-}
-
-static __always_inline bool query_flow_filter(struct network_flow flow,bool flowset_id) {
-
+  //TODO:move this out of the function
   __u128 flow_key = 0;
   memcpy(&flow_key, &flow, sizeof(struct network_flow));
 
+  
   for (int i = 0; i < FLOW_FILTER_HASH_COUNT; ++i) {
-    int offset = murmurhash(flow_key, i) % BITS_PER_SLICE;
-    int hashIndex = i * BITS_PER_SLICE + offset;
-    bool *set;
-    if(flowset_id){
-      set = bpf_map_lookup_elem(&Flow_filter_1, &hashIndex);
-    }else{
-      set = bpf_map_lookup_elem(&Flow_filter_0, &hashIndex);
-    }
-    if (set) {
-      if (*set == false) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
+    
+    //Generate Hash
+    __u32 offset;
+    MurmurHash3_x86_32(&flow_key,16,i,&offset);
+    offset=offset%FLOW_FILTER_BITS_PER_SLICE;
+    __u32 hashIndex = i * FLOW_FILTER_BITS_PER_SLICE + offset;
 
-static __always_inline int
-insert_flow_to_counting_table(struct network_flow flow, bool old_flow,bool flowset_id) {
-
-  //int num_buckets = COUNTING_TABLE_HASH_COUNT;
-
-  __u128 flowKey = 0;
-  memcpy(&flowKey, &flow, sizeof(struct network_flow));
-
-  for (int i = 0; i < COUNTING_TABLE_HASH_COUNT; ++i) {
-
-    __u32 j = i;
-
-    struct counting_table_entry *ct = NULL;
-    struct counting_table_entry cte;
-
-    int bucket_index = jhash_flow(flow, j) % COUNTING_TABLE_SIZE;
-    // Hash Value % BUCKET_SIZE 7500;
-
-    if(flowset_id){
-        ct = bpf_map_lookup_elem(&Counting_table_1, &bucket_index);
-    }else{
-        ct = bpf_map_lookup_elem(&Counting_table_0, &bucket_index);
-    }
-
-    if(ct){
-      cte=*ct;
-    }else{
+    if(hashIndex>=FLOW_FILTER_SIZE){
       return -1;
     }
 
-    if(old_flow){
-      cte.packetCount++; 
-    }else{
-      cte.flowXOR ^= flowKey;
-      cte.packetCount++;
-      cte.flowCount++;
-    }
-
-    if(flowset_id){
-      bpf_map_update_elem(&Counting_table_1, &bucket_index, &cte, BPF_EXIST);
-    }else{
-      bpf_map_update_elem(&Counting_table_0, &bucket_index, &cte, BPF_EXIST);
-    }
-
-
-    // if (old_flow == true) {
-    //   // Packet Comes from an existing flow
-    //   // ct = bpf_map_lookup_elem(&counting_table, &bucket_index);
-
-    //   if (ct) {
-    //     struct counting_table_entry cte = *ct;
-    //     // cte.flowXOR ^= flowKey;
-    //     cte.packetCount++;
-    //     bpf_map_update_elem(&counting_table, &bucket_index, &cte, BPF_EXIST);
-    //   } else {
-    //     return -1;
-    //   }
-
-    // } else {
-    //   // Packet Comes from a new flow
-    //   // ct = bpf_map_lookup_elem(&counting_table, &bucket_index);
-
-    //   if (ct) {
-    //     struct counting_table_entry cte = *ct;
-    //     cte.flowXOR ^= flowKey;
-    //     cte.packetCount++;
-    //     cte.flowCount++;
-    //     bpf_map_update_elem(&counting_table, &bucket_index, &cte, BPF_EXIST);
-    //   } else {
-    //     return -1;
-    //   }
-    // }
+    //set the bit
+    curr_flowset->flow_filter[hashIndex]=true;
   }
 
   return 0;
 }
-// k = seed value // which slice
-// hostID = host Num;
-// flow sh;
+
+static __always_inline bool is_old_flow(struct network_flow flow,struct flowset *curr_flowset) {
+
+  //TODO:move this out of the function
+__u128 flow_key = 0;
+memcpy(&flow_key, &flow, sizeof(struct network_flow));
+
+  for (int i = 0; i < FLOW_FILTER_HASH_COUNT; i++) {
+
+    //generate hash
+    __u32 offset;
+    MurmurHash3_x86_32(&flow_key,16,i,&offset);
+    offset=offset%FLOW_FILTER_BITS_PER_SLICE;
+    __u32 hashIndex = i * FLOW_FILTER_BITS_PER_SLICE + offset;
+
+
+    if(hashIndex>=FLOW_FILTER_SIZE){
+      return -1;
+    }
+
+    if(curr_flowset->flow_filter[hashIndex]==false){
+      return false;  //new flow
+    }
+
+  }
+  return true; //old flow
+}
+
+static __always_inline int
+insert_flow_to_counting_table(struct network_flow flow, bool old_flow,struct flowset *curr_flowset) {
+
+
+//TODO: move out of function
+  __u128 flow_key = 0;
+  memcpy(&flow_key, &flow, sizeof(struct network_flow));
+
+  for (int i = 0; i < COUNTING_TABLE_HASH_COUNT; ++i) {
+
+    //generate hash
+    __u32 offset;
+    MurmurHash3_x86_32(&flow_key,16,i,&offset);
+    offset=offset%COUNTING_TABLE_ENTRIES_PER_SLICE;
+    __u32 hashIndex=i*COUNTING_TABLE_ENTRIES_PER_SLICE+offset;
+
+    
+    if(hashIndex>=COUNTING_TABLE_SIZE){
+      return -1;
+    }
+
+    struct counting_table_entry cte =curr_flowset->counting_table[hashIndex];
+
+    if(old_flow){
+      cte.packetCount++;
+    }else{
+      cte.flowXOR ^= flow_key;
+      cte.packetCount++;
+      cte.flowCount++;
+    }
+    
+    curr_flowset->counting_table[hashIndex]=cte;
+
+  }
+
+  return 0;
+}
+
 
 SEC("xdp")
 int xdp_parse_flow(struct xdp_md *ctx) {
@@ -201,6 +142,8 @@ int xdp_parse_flow(struct xdp_md *ctx) {
   void *data = (void *)(long)ctx->data;
   struct ethhdr *eth = data;
   __u16 h_proto;
+
+  //TODO:do data+sizeof operations efficiently(without repitition)
 
   // Packet Does not Contain Ethernet Header (Even if this passes it might not contain eth header as it can
   // be a raw IP packet)
@@ -253,48 +196,62 @@ int xdp_parse_flow(struct xdp_md *ctx) {
     source_port = udp->source;
     dest_port = udp->dest;
 
-  } else /*if (ip->protocol == IPPROTO_ICMP)*/ {
+  } else {
 
     return XDP_PASS;
   }
 
-  // bpf_printk("Flow: %-3u %-3u %-3u %-3u %-3u", source_ip, dest_ip,
-  // source_port, dest_port, protocol);
 
-  // generate_flow_key();
   struct network_flow nflow = (struct network_flow){.source_ip = source_ip,
                                                     .dest_ip = dest_ip,
                                                     .source_port = source_port,
                                                     .dest_port = dest_port,
                                                     .protocol = protocol};
-  // print_flow(nflow);
-  // struct network_flow * nf = NULL;
-  // bpf_printk("%x",nflow);
+
 
   bool old_flow = false;
 
   //Get the ID of the flowset to which the flow should be inserted
-  int temp=0;
-  bool *flowset_id_ptr = bpf_map_lookup_elem(&Flowset_ID, &temp);
-  bool flowset_id;
+  int first=0;
+  struct flowset_id_struct *flowset_id_ptr = bpf_map_lookup_elem(&Flowset_ID, &first);
+  struct flowset *flowset_0=bpf_map_lookup_elem(&Flow_set_0,&first);
+  struct flowset *flowset_1=bpf_map_lookup_elem(&Flow_set_1,&first);
+  
+  //start only when flowset_id initialized
+  if(flowset_id_ptr && flowset_0 && flowset_1){
 
-  if(flowset_id_ptr){
-    flowset_id=*flowset_id_ptr;
-  }else{
-    //if flowset_id not initialized start from 0
-    flowset_id=false;
+    bpf_spin_lock(&flowset_id_ptr->lock);
+
+    bool flowset_id=flowset_id_ptr->id;
+    struct flowset *curr_flowset=NULL;
+
+
+    if(flowset_id){
+      curr_flowset=flowset_1;
+    }else{
+      curr_flowset=flowset_0;
+    }
+    
+    
+    if(curr_flowset){
+
+      
+      //checking whether old flow and insert if its not
+      if (is_old_flow(nflow,curr_flowset)) {
+        old_flow = true;
+      } else {
+        insert_to_flow_filter(nflow,curr_flowset);
+      }
+
+      insert_flow_to_counting_table(nflow, old_flow,curr_flowset);
+
+
+    }
+
+    bpf_spin_unlock(&flowset_id_ptr->lock);
+
   }
 
-
-
-  //checking whether old flow and insert if its not
-  if (query_flow_filter(nflow,flowset_id)) {
-    old_flow = true;
-  } else {
-    insert_to_flow_filter(nflow,flowset_id);
-  }
-
-  insert_flow_to_counting_table(nflow, old_flow,flowset_id);
 
   return XDP_PASS;
 }
