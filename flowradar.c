@@ -85,7 +85,7 @@ static void start_decode(int flowset_fd_0,int flowset_fd_1,int flowset_id_fd) {
     printf("Getting the flowset from kernel space\n");
     bpf_map_lookup_elem(curr_flowset_fd,&first,&flow_set);
 
-    // printf("FlowXOR ,FlowCount ,PacketCount\n");
+    printf("FlowXOR ,FlowCount ,PacketCount\n");
     for(int i=0;i<COUNTING_TABLE_SIZE;i++){
 
       struct counting_table_entry cte=flow_set.counting_table[i];
@@ -93,9 +93,9 @@ static void start_decode(int flowset_fd_0,int flowset_fd_1,int flowset_id_fd) {
 
       if(cte.flowXOR){
          ct_empty=false;
-        // printf("%" PRIx64 "%016" PRIx64, (uint64_t)(cte.flowXOR >> 64),
-        //       (uint64_t)cte.flowXOR);
-        // printf(" ,%d ,%d\n", cte.flowCount, cte.packetCount);
+        printf("%" PRIx64 "%016" PRIx64, (uint64_t)(cte.flowXOR >> 64),
+              (uint64_t)cte.flowXOR);
+        printf(" ,%d ,%d\n", cte.flowCount, cte.packetCount);
       }
 
     }
@@ -135,7 +135,7 @@ static void start_decode(int flowset_fd_0,int flowset_fd_1,int flowset_id_fd) {
     
     //perform counter decode
     printf("Starting Counter Decode\n");
-    counter_decode(pure_set,pktCount);
+    counter_decode(&pure_set,pktCount);
   }
 }
 

@@ -97,37 +97,35 @@ double *method_lsq(double **eq_matrix, double *pktcount_mtrx,
   return sol_array;
 }
 
-int counter_decode(struct pureset pure_set, __u32 pktCount[COUNTING_TABLE_SIZE]) {
+int counter_decode(struct pureset *pure_set, __u32 *pktCount) {
   /*
       To run CounterDecode on the flowlist. The target is to solve Ax = B where
      B -> Packet counts and A is a binary matrix
       */
 
+  //setting eq_matrix
   double **eq_matrix = (double **)calloc(COUNTING_TABLE_SIZE, sizeof(double *));
-
-  int num_purecells = pure_set.latest_index;
-
-  double *pktcount_matrix =
-      (double *)malloc(COUNTING_TABLE_SIZE * sizeof(double));
-
-  for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
-
-    pktcount_matrix[i] = pktCount[i];
-  }
-
+  int num_purecells = pure_set->latest_index;
   for (int i = 0; i < COUNTING_TABLE_SIZE; i++) {
-
     eq_matrix[i] = (double *)calloc(num_purecells, sizeof(double));
   }
 
+  //setting up pktcount_matrix
+  double *pktcount_matrix =
+      (double *)malloc(COUNTING_TABLE_SIZE * sizeof(double));
+  for (int i = 0; i < COUNTING_TABLE_SIZE; ++i) {
+    pktcount_matrix[i] = pktCount[i];
+  }
+
+  printf("Filling the eq_matrix\n");
   for (int j = 0; j < num_purecells; j++) {
 
-    __u128 flow_id = pure_set.purecells[j];
+    __u128 flow_id = pure_set->purecells[j];
 
     for (int num_hash = 0; num_hash < COUNTING_TABLE_HASH_COUNT; num_hash++) {
 
       //generate hash
-      __u32 offset=0;
+      __u32 offset;
       MurmurHash3_x86_32(&flow_id,16,num_hash,&offset);
       offset=offset%COUNTING_TABLE_ENTRIES_PER_SLICE;
       __u32 hashIndex=num_hash*COUNTING_TABLE_ENTRIES_PER_SLICE+offset;
@@ -136,6 +134,7 @@ int counter_decode(struct pureset pure_set, __u32 pktCount[COUNTING_TABLE_SIZE])
     }
   }
 
+  printf("Starting Least Squares method");
   double *sol_array = method_lsq(eq_matrix, pktcount_matrix, num_purecells);
   printf("\nCounter Decode complete...\n");
 
@@ -158,8 +157,8 @@ int counter_decode(struct pureset pure_set, __u32 pktCount[COUNTING_TABLE_SIZE])
     //write to log file
     fprintf(fptr,"%lu,",(unsigned long)time(NULL));  //timestamp
     fprintf(fptr,"%" PRIx64 "%016" PRIx64",",
-             (uint64_t)(pure_set.purecells[i] >> 64),
-             (uint64_t)pure_set.purecells[i]);
+             (uint64_t)(pure_set->purecells[i] >> 64),
+             (uint64_t)pure_set->purecells[i]);
     fprintf(fptr,"%d\n",(int)round(sol_array[i]));  //rounding off to nearest integer
   }
 
