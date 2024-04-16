@@ -7,6 +7,7 @@
 6. Ask about hashes are implemented for consistent implementation with theirs
 7. Extra metadata to be stored?  (e.g., packet counters, and the flow starting and finish times).
 8. When should we clear the flowset? In the simulation its done in sequential order. [x]
+9. Currently only testing with TCP and UDP packets. Is that enough?
 
 # Check
 1. Check all TODOs
