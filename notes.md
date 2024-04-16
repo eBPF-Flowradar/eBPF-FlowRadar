@@ -9,6 +9,7 @@
 8. When should we clear the flowset? In the simulation its done in sequential order. [x]
 9. Currently only testing with TCP and UDP packets. Is that enough?
 10. Added ethernet headers to packets using scapy, certain metadata is missing from the packet (flow id and time is maintatined)
+11. How are you guys doing counter decode? In P4 or simulating in python
 
 # Check
 1. Check all TODOs
