@@ -1,10 +1,16 @@
 #include "flowradar.h"
 
-void add(struct pureset *flowSet, __u128 flowXOR) {
+void add(struct pureset *pure_set, __u128 flowXOR) {
 
   //each element of pure set is unique no check required(verify)
-  flowSet->purecells[flowSet->latest_index] = flowXOR;
-  flowSet->latest_index = flowSet->latest_index + 1;
+  if(pure_set->latest_index>=PURE_SET_SIZE){
+    printf("pure_set Index exceeds PURE_SET_SIZE\n");
+    exit(1);   //handle errors here (including removing the xdp program)
+  }
+
+
+  pure_set->purecells[pure_set->latest_index] = flowXOR;
+  pure_set->latest_index = pure_set->latest_index + 1;
 }
 
 

@@ -73,6 +73,7 @@ static void start_decode(int flowset_fd_0,int flowset_fd_1,int flowset_id_fd) {
       printf("Flowset 0 in use\n");
     }
   
+    printf("Inverting the flowset\n");
     //invert Flowset_ID
     current.id=!(current.id);
     //wait till lock release to update
@@ -81,9 +82,10 @@ static void start_decode(int flowset_fd_0,int flowset_fd_1,int flowset_id_fd) {
     //   return ret;
     // }
 
+    printf("Getting the flowset from kernel space\n");
     bpf_map_lookup_elem(curr_flowset_fd,&first,&flow_set);
 
-    printf("FlowXOR ,FlowCount ,PacketCount\n");
+    // printf("FlowXOR ,FlowCount ,PacketCount\n");
     for(int i=0;i<COUNTING_TABLE_SIZE;i++){
 
       struct counting_table_entry cte=flow_set.counting_table[i];
@@ -91,9 +93,9 @@ static void start_decode(int flowset_fd_0,int flowset_fd_1,int flowset_id_fd) {
 
       if(cte.flowXOR){
          ct_empty=false;
-        printf("%" PRIx64 "%016" PRIx64, (uint64_t)(cte.flowXOR >> 64),
-              (uint64_t)cte.flowXOR);
-        printf(" ,%d ,%d\n", cte.flowCount, cte.packetCount);
+        // printf("%" PRIx64 "%016" PRIx64, (uint64_t)(cte.flowXOR >> 64),
+        //       (uint64_t)cte.flowXOR);
+        // printf(" ,%d ,%d\n", cte.flowCount, cte.packetCount);
       }
 
     }
@@ -108,6 +110,7 @@ static void start_decode(int flowset_fd_0,int flowset_fd_1,int flowset_id_fd) {
 
 
     //reset the flowset 
+    printf("Reset the flowset in kernel space\n");
     initialize_flowset(curr_flowset_fd);
 
 
@@ -115,21 +118,23 @@ static void start_decode(int flowset_fd_0,int flowset_fd_1,int flowset_id_fd) {
     struct pureset pure_set;
     pure_set.latest_index=0;
     //perform single decode till there are no pure cells left
+    printf("Starting single decode\n");
     while(check_purecells(&flow_set)){
 
       single_decode(&flow_set,&pure_set);
 
     }
 
-    printf("\nSingle Decode Complete.....\nPureCells\n");
-    for (int i = 0; i < pure_set.latest_index; i++) {
-      printf("%" PRIx64 "%016" PRIx64 "\n",
-             (uint64_t)(pure_set.purecells[i] >> 64),
-             (uint64_t)pure_set.purecells[i]);
-    }
-    
+    printf("\nSingle Decode Complete.....\nNumber of PureCells:%d\n",pure_set.latest_index);
+    // printf("\nSingle Decode Complete.....\nPureCells\n");
+    // for (int i = 0; i < pure_set.latest_index; i++) {
+    //   printf("%" PRIx64 "%016" PRIx64 "\n",
+    //          (uint64_t)(pure_set.purecells[i] >> 64),
+    //          (uint64_t)pure_set.purecells[i]);
+    // }
     
     //perform counter decode
+    printf("Starting Counter Decode\n");
     counter_decode(pure_set,pktCount);
   }
 }
@@ -150,6 +155,7 @@ int main(int argc, char *argv[]) {
 
   signal(SIGINT, int_exit);
   signal(SIGTERM, int_exit);
+  signal(SIGKILL,int_exit);
 
   if (argc != 2) {
     printf("Usage: %s Interface_Name\n", argv[0]);
