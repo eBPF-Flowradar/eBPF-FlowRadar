@@ -8,6 +8,7 @@
 7. Extra metadata to be stored?  (e.g., packet counters, and the flow starting and finish times).
 8. When should we clear the flowset? In the simulation its done in sequential order. [x]
 9. Currently only testing with TCP and UDP packets. Is that enough?
+10. Added ethernet headers to packets using scapy, certain metadata is missing from the packet (flow id and time is maintatined)
 
 # Check
 1. Check all TODOs
@@ -39,10 +40,12 @@
 1. Errors due to empty flowsets being passed down to gsl [x]
 
 # Important Commands
-1.`sudo ip link set dev enp1s0  xdpgeneric off` : To unload XDP program from enp1s0 interface
-2.`sudo ip link show dev enp1s0` : Shows if XDP program is loaded in enp1s0 interface
+1.`sudo ip link set dev enp7s0  xdpgeneric off` : To unload XDP program from enp7s0 interface
+2.`sudo ip link show dev enp7s0` : Shows if XDP program is loaded in enp7s0 interface
 3.`sudo cat /sys/kernel/tracing/trace_pipe` : bpf tracepipe (bpf_printk() for printing)
 4.`sudo ip link set dev <interface> up` : setting the interface up
+5.`tcprewrite --dlt=enet --enet-dmac=00:11:22:33:44:55 --enet-smac=66:77:88:99:AA:BB --infile=input.pcap --outfile=output.pcap`[Adding fake ethernet headers (but not working)](https://edeca.net/post/2011-06-20-adding-fake-ethernet-headers-to-pcap-files/)
+6`.sudo tcpreplay -i veth1 output_with_eth.pcap`  [refer](https://tcpreplay.appneta.com/wiki/tcpreplay)
 
 # Notes
 1. The 110k_24k_caida.pcap has raw ip packets without the ethernet header, this causes issues with our program as it expects ethernet headers, currently while testing with scapy we are adding the ethernet headers and sending to the interface.

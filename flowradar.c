@@ -139,14 +139,14 @@ int main(int argc, char *argv[]) {
   int prog_fd, map_fd, ret;
   struct bpf_object *bpf_obj;
 
-  //check if necessary
-  // struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
+  //check if necessary (setting resource limits to infinity)
+  struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
 
-  //// IS THIS NECESSARY
-  // if (setrlimit(RLIMIT_MEMLOCK, &r)) {
-  //   fprintf(stderr, "ERROR:failed to set rlimit\n");
-  //   return 1;
-  // }
+  // IS THIS NECESSARY
+  if (setrlimit(RLIMIT_MEMLOCK, &r)) {
+    fprintf(stderr, "ERROR:failed to set rlimit\n");
+    return 1;
+  }
 
   signal(SIGINT, int_exit);
   signal(SIGTERM, int_exit);
