@@ -3,10 +3,10 @@
 2. We will be having this installed in every host?[x]
 3. Doubt in Counter decode in figure paper.
 4. XDP can only capture packets from RX (incoming side). Is that a problem ?
-5. See #Notes 1
+5. Is there an issue with adding the ethernet headers ? [x]
 6. Ask about hashes are implemented for consistent implementation with theirs
 7. Extra metadata to be stored?  (e.g., packet counters, and the flow starting and finish times).
-8. When should we clear the flowset? In the simulation its done in sequential order?
+8. When should we clear the flowset? In the simulation its done in sequential order. [x]
 
 # Check
 1. Check all TODOs
@@ -15,15 +15,12 @@
 4. Verify lsqr solver(partially verified)
 5. Standard values to be used 
 6. Concurrency controls - use two flowsets [x]
-7. murmur hash implementations
+7. murmur hash implementations[x]
 8. make time to 280ms[x]
 9. Test with bridging[x]
 10. Test the implementation
-11. Some random packets are being sent on the interface
-12. Match number of packets in listener and eBPF program[x]
-13. Packets rounded to nearest integer after calculation (instead of simplifying the calculation)
-14. Check pure set implementation
-15. Proper flow for returning errors.Check return values of bpf helpers and perform required action
+11. Match number of packets in listener and eBPF program[x]
+12. Check pure set implementation
 
 # Things Need to be done
 1. Pureset need not be a set as the flows added will be unique always [x]
@@ -31,9 +28,11 @@
 3. delay before start_decode function [x]
 4. Unload the XDP program on error
 5. Continue the loop if counting table empty in start_decode [x]
-6. Replace the bpf maps with support for locks
+6. Replace the bpf maps with support for locks[x]
     - [lwn article on BPF spinlocks](https://lwn.net/Articles/779120/)
     -[example](https://lwn.net/ml/netdev/20190131234012.3712779-10-ast@kernel.org/)
+7. Prevent random packets sent on interface
+8. Proper flow for returning errors.Check return values of bpf helpers and perform required action
 
 # Errors
 1. Errors due to empty flowsets being passed down to gsl [x]
@@ -47,6 +46,7 @@
 # Notes
 1. The 110k_24k_caida.pcap has raw ip packets without the ethernet header, this causes issues with our program as it expects ethernet headers, currently while testing with scapy we are adding the ethernet headers and sending to the interface.
 2. Only supporting IP packets (TCP and UDP)
+3. Counter decode done with gsl library.Packets rounded to nearest integer after calculation (instead of simplifying the calculation)
 
 # Resources to setup veth
 1. Run script.sh
