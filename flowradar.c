@@ -49,6 +49,7 @@ static void start_decode(int flowset_fd_0,int flowset_fd_1,int flowset_id_fd) {
 
 
     //variable to store whether the counting table is empty or not
+    //TODO:Can this be more efficient (to check whether ct_empty)
     bool ct_empty=true; 
 
     loop++;
