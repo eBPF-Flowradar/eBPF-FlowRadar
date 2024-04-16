@@ -23,6 +23,7 @@
 10. Test the implementation
 11. Match number of packets in listener and eBPF program[x]
 12. Check pure set implementation
+13. Check better implementation for counter decode [checkout other workspaces](https://www.gnu.org/software/gsl/doc/html/lls.html?highlight=gsl_multifit_linear)
 
 # Things Need to be done
 1. Pureset need not be a set as the flows added will be unique always [x]

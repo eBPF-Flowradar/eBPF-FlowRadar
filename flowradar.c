@@ -56,7 +56,7 @@ static void start_decode(int flowset_fd_0,int flowset_fd_1,int flowset_id_fd) {
     
 
     struct flowset flow_set;
-    __u32 pktCount[COUNTING_TABLE_SIZE];
+    double pktCount[COUNTING_TABLE_SIZE];  //double because to use in gsl
 
     //Get map currently in use
     struct flowset_id_struct current;
@@ -85,7 +85,7 @@ static void start_decode(int flowset_fd_0,int flowset_fd_1,int flowset_id_fd) {
     printf("Getting the flowset from kernel space\n");
     bpf_map_lookup_elem(curr_flowset_fd,&first,&flow_set);
 
-    printf("FlowXOR ,FlowCount ,PacketCount\n");
+    // printf("FlowXOR ,FlowCount ,PacketCount\n");
     for(int i=0;i<COUNTING_TABLE_SIZE;i++){
 
       struct counting_table_entry cte=flow_set.counting_table[i];
@@ -93,9 +93,9 @@ static void start_decode(int flowset_fd_0,int flowset_fd_1,int flowset_id_fd) {
 
       if(cte.flowXOR){
          ct_empty=false;
-        printf("%" PRIx64 "%016" PRIx64, (uint64_t)(cte.flowXOR >> 64),
-              (uint64_t)cte.flowXOR);
-        printf(" ,%d ,%d\n", cte.flowCount, cte.packetCount);
+        // printf("%" PRIx64 "%016" PRIx64, (uint64_t)(cte.flowXOR >> 64),
+        //       (uint64_t)cte.flowXOR);
+        // printf(" ,%d ,%d\n", cte.flowCount, cte.packetCount);
       }
 
     }
@@ -118,14 +118,14 @@ static void start_decode(int flowset_fd_0,int flowset_fd_1,int flowset_id_fd) {
     struct pureset pure_set;
     pure_set.latest_index=0;
     //perform single decode till there are no pure cells left
-    printf("Starting single decode\n");
+    printf("\nStarting single decode\n");
     while(check_purecells(&flow_set)){
 
       single_decode(&flow_set,&pure_set);
 
     }
 
-    printf("\nSingle Decode Complete.....\nNumber of PureCells:%d\n",pure_set.latest_index);
+    printf("Single Decode Complete.....\nNumber of PureCells:%d\n",pure_set.latest_index);
     // printf("\nSingle Decode Complete.....\nPureCells\n");
     // for (int i = 0; i < pure_set.latest_index; i++) {
     //   printf("%" PRIx64 "%016" PRIx64 "\n",
@@ -134,7 +134,7 @@ static void start_decode(int flowset_fd_0,int flowset_fd_1,int flowset_id_fd) {
     // }
     
     //perform counter decode
-    printf("Starting Counter Decode\n");
+    printf("\nStarting Counter Decode\n");
     counter_decode(&pure_set,pktCount);
   }
 }
