@@ -23,9 +23,6 @@ struct {
   __uint(max_entries, 1);
 } Flowset_ID SEC(".maps");
 
-
-
-
 //Define Flow Set 0
 struct {
   __uint(type, BPF_MAP_TYPE_ARRAY);
@@ -44,12 +41,7 @@ struct {
 
 
 
-static __always_inline int insert_to_flow_filter(struct network_flow flow,struct flowset *curr_flowset) {
-
-  //TODO:move this out of the function
-  __u128 flow_key = 0;
-  memcpy(&flow_key, &flow, sizeof(struct network_flow));
-
+static __always_inline int insert_to_flow_filter(__u128 flow_key,struct flowset *curr_flowset) {
   
   for (int i = 0; i < FLOW_FILTER_HASH_COUNT; ++i) {
     
@@ -70,11 +62,7 @@ static __always_inline int insert_to_flow_filter(struct network_flow flow,struct
   return 0;
 }
 
-static __always_inline bool is_old_flow(struct network_flow flow,struct flowset *curr_flowset) {
-
-  //TODO:move this out of the function
-__u128 flow_key = 0;
-memcpy(&flow_key, &flow, sizeof(struct network_flow));
+static __always_inline bool is_old_flow(__u128 flow_key,struct flowset *curr_flowset) {
 
   for (int i = 0; i < FLOW_FILTER_HASH_COUNT; i++) {
 
@@ -98,12 +86,8 @@ memcpy(&flow_key, &flow, sizeof(struct network_flow));
 }
 
 static __always_inline int
-insert_flow_to_counting_table(struct network_flow flow, bool old_flow,struct flowset *curr_flowset) {
+insert_flow_to_counting_table(__u128 flow_key, bool old_flow,struct flowset *curr_flowset) {
 
-
-//TODO: move out of function
-  __u128 flow_key = 0;
-  memcpy(&flow_key, &flow, sizeof(struct network_flow));
 
   for (int i = 0; i < COUNTING_TABLE_HASH_COUNT; ++i) {
 
@@ -143,7 +127,6 @@ int xdp_parse_flow(struct xdp_md *ctx) {
   struct ethhdr *eth = data;
   __u16 h_proto;
 
-  //TODO:do data+sizeof operations efficiently(without repitition)
 
   // Packet Does not Contain Ethernet Header (Even if this passes it might not contain eth header as it can
   // be a raw IP packet)
@@ -217,7 +200,7 @@ int xdp_parse_flow(struct xdp_md *ctx) {
   struct flowset *flowset_0=bpf_map_lookup_elem(&Flow_set_0,&first);
   struct flowset *flowset_1=bpf_map_lookup_elem(&Flow_set_1,&first);
   
-  //start only when flowset_id initialized
+  //start only when flowset_id  and flowsets are initialized
   if(flowset_id_ptr && flowset_0 && flowset_1){
 
     bpf_spin_lock(&flowset_id_ptr->lock);
@@ -231,22 +214,21 @@ int xdp_parse_flow(struct xdp_md *ctx) {
     }else{
       curr_flowset=flowset_0;
     }
+
+    //expanding network flow to 128 bits (Check:Is is possible without this?)
+    __u128 flow_key;
+    memcpy(&flow_key, &nflow, sizeof(struct network_flow));
     
     
-    if(curr_flowset){
-
-      
-      //checking whether old flow and insert if its not
-      if (is_old_flow(nflow,curr_flowset)) {
-        old_flow = true;
-      } else {
-        insert_to_flow_filter(nflow,curr_flowset);
-      }
-
-      insert_flow_to_counting_table(nflow, old_flow,curr_flowset);
-
-
+    //checking whether old flow and insert if its not
+    if (is_old_flow(flow_key,curr_flowset)) {
+      old_flow = true;
+    } else {
+      insert_to_flow_filter(flow_key,curr_flowset);
     }
+
+    insert_flow_to_counting_table(flow_key, old_flow,curr_flowset);
+
 
     bpf_spin_unlock(&flowset_id_ptr->lock);
 

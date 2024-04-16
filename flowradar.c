@@ -13,7 +13,7 @@
 #include <unistd.h>
 #include <xdp/libxdp.h>
 
-//TODO: check if these variables necessary
+
 static int ifindex;
 struct xdp_program *prog = NULL;
 int first=0; //used for accessing the only element in flowset_id
