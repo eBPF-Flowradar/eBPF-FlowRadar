@@ -40,6 +40,7 @@
 
 # Errors
 1. Errors due to empty flowsets being passed down to gsl [x]
+2. -O2,-O3 flags causes pureset_latest_index to exceed  PURESET_SIZE
 
 # Important Commands
 1.`sudo ip link set dev enp7s0  xdpgeneric off` : To unload XDP program from enp7s0 interface
