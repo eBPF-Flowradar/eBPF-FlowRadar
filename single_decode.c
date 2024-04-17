@@ -4,7 +4,7 @@ void add(struct pureset *pure_set, __u128 flowXOR) {
 
   //each element of pure set is unique no check required(verify)
   if(pure_set->latest_index>=PURE_SET_SIZE){
-    printf("pure_set Index exceeds PURE_SET_SIZE\n");
+    printf("pure_set Index (%d) exceeds PURE_SET_SIZE(%d)\n",pure_set->latest_index,PURE_SET_SIZE);
     exit(1);   //handle errors here (including removing the xdp program)
   }
 
