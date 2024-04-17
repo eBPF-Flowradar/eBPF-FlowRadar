@@ -21,7 +21,7 @@ int counter_decode(struct pureset *pure_set, double *pktCount) {
   gsl_vector *x= gsl_vector_alloc(num_purecells);
   // Allocate memory for B;
   gsl_vector *B= gsl_vector_alloc(COUNTING_TABLE_SIZE); 
-  // Allocate memory for covariance (is this necessary)
+  // Allocate memory for covariance
   gsl_matrix *cov= gsl_matrix_alloc(num_purecells, num_purecells);
   // allocate memory for workspace
   gsl_multifit_linear_workspace *work=gsl_multifit_linear_alloc(COUNTING_TABLE_SIZE, num_purecells);
