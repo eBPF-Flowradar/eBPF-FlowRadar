@@ -21,6 +21,10 @@
 #define POLL_TIME_MS  280  //in milliseconds (280)
 #define POLL_TIME_US POLL_TIME_MS*1000   // in microseconds
 
+#define SINGLE_DECODE_LOG_FILE "sd_logs.csv"
+#define COUNTER_DECODE_LOG_FILE "cd_logs.csv"
+
+
 struct pureset {
   __u128 purecells[PURE_SET_SIZE];
   int latest_index;

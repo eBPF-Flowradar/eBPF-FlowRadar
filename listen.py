@@ -2,6 +2,7 @@ from scapy.all import sniff
 from ipaddress import ip_address
 import struct
 from time import time
+import os
 
 
 
@@ -45,6 +46,13 @@ def packet_callback(packet):
             file.write(f"{int(time())},{hex_value}\n")
 
 #        print(packet.summary())
+
+#delete the previous log file if it exists
+try:
+    os.remove(LOG_FILE)
+except OSError:
+    pass
+
 
 # Replace 'eth0' with the interface you want to listen on
 sniff(iface='veth2', prn=packet_callback, store=0)

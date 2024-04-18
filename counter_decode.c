@@ -65,7 +65,7 @@ int counter_decode(struct pureset *pure_set, double *pktCount) {
 
   printf("Writing to log file\n");
   FILE *fptr;
-  fptr=fopen("cd_logs.csv","a");
+  fptr=fopen(COUNTER_DECODE_LOG_FILE,"a");
 
   if (fptr == NULL) {
     perror("Error opening file");

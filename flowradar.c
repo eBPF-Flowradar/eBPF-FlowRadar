@@ -126,13 +126,36 @@ static void start_decode(int flowset_fd_0,int flowset_fd_1,int flowset_id_fd) {
 
     }
 
-    printf("Single Decode Complete.....\nNumber of PureCells:%d\n",pure_set.latest_index);
-    // printf("\nSingle Decode Complete.....\nPureCells\n");
-    // for (int i = 0; i < pure_set.latest_index; i++) {
-    //   printf("%" PRIx64 "%016" PRIx64 "\n",
-    //          (uint64_t)(pure_set.purecells[i] >> 64),
-    //          (uint64_t)pure_set.purecells[i]);
-    // }
+    int num_purecells=pure_set.latest_index;
+    printf("Single Decode Complete.....\nNumber of PureCells:%d\n",num_purecells);
+
+    printf("Writing to log file\n");
+    FILE *fptr;
+    fptr=fopen(SINGLE_DECODE_LOG_FILE,"a");
+
+    if (fptr == NULL) {
+      perror("Error opening file");
+      return;  // or handle the error as needed
+    }
+
+    for (int i = 0; i < num_purecells; i++) {
+
+      //printing the purecells
+      //printf("%" PRIx64 "%016" PRIx64 "\n",
+      //(uint64_t)(pure_set.purecells[i] >> 64),
+      //(uint64_t)pure_set.purecells[i]);
+      
+      //write to log file
+      // fprintf(fptr,"%lu,",(unsigned long)time(NULL));  //timestamp
+      fprintf(fptr,"%" PRIx64 "%016" PRIx64"\n",
+              (uint64_t)(pure_set.purecells[i] >> 64),
+              (uint64_t)pure_set.purecells[i]);
+    }
+
+    fclose(fptr);
+    printf("Write complete\n");
+
+
     
     //perform counter decode
     printf("\nStarting Counter Decode\n");
@@ -202,6 +225,10 @@ int main(int argc, char *argv[]) {
   // if(ret<0){
   //   return ret;
   // }
+
+  //remove log files if exist
+  remove(SINGLE_DECODE_LOG_FILE);
+  remove(COUNTER_DECODE_LOG_FILE);
 
 
   start_decode(Flowset_fd_0,Flowset_fd_1,Flowset_id_fd);

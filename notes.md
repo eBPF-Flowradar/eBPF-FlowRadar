@@ -37,6 +37,7 @@
     -[example](https://lwn.net/ml/netdev/20190131234012.3712779-10-ast@kernel.org/)
 7. Prevent random packets sent on interface
 8. Proper flow for returning errors.Check return values of bpf helpers and perform required action
+9. Remove timestamp from counter decode output
 
 # Errors
 1. Errors due to empty flowsets being passed down to gsl [x]
