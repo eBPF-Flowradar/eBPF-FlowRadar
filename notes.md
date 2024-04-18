@@ -7,7 +7,7 @@
 6. Ask about hashes are implemented for consistent implementation with theirs
 7. Extra metadata to be stored?  (e.g., packet counters, and the flow starting and finish times).
 8. When should we clear the flowset? In the simulation its done in sequential order. [x]
-9. Currently only testing with TCP and UDP packets. Is that enough?(in simulation other packets are supported by having 0 as src port and destination port. In query only there is support for IPV6(ask if required))
+9. Currently only testing with TCP and UDP packets. Is that enough?(in simulation other packets are supported by having 0 as src port and destination port. In query only there is support for IPV6(ask if required only 2 IPv6 packets in pcap file))
 10. Added ethernet headers to packets using scapy, certain metadata is missing from the packet (flow id and time is maintatined)
 11. How are you guys doing counter decode? In P4 or simulating in python
 12. Sleeping for 280ms is implemented through usleep. Wont be accurate. Is that enough?
