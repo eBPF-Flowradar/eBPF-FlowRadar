@@ -56,6 +56,6 @@
 3. Counter decode done with gsl library.Packets rounded to nearest integer after calculation (instead of simplifying the calculation)
 
 # Resources to setup veth
-1. Run script.sh
+1. Run setup_veth.sh
 2. Check https://linuxconfig.org/how-to-use-bridged-networking-with-libvirt-and-kvm to setup with virt-manager
 3. Add interface to virt-manager and ensure the interface is up
