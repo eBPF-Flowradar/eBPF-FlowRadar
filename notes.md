@@ -11,6 +11,7 @@
 10. Added ethernet headers to packets using scapy, certain metadata is missing from the packet (flow id and time is maintatined)
 11. How are you guys doing counter decode? In P4 or simulating in python
 12. Sleeping for 280ms is implemented through usleep. Wont be accurate. Is that enough?
+13. Currently packets gets inserted into 2 or 3 flowsets. Should all packets be inserted into the same flowset?
 
 # Check
 1. Check all TODOs
