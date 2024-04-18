@@ -3,5 +3,6 @@
 .vscode/
 flowradar
 *.pcap
+*.pkl
 venv/
 results/

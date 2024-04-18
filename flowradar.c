@@ -158,8 +158,8 @@ static void start_decode(int flowset_fd_0,int flowset_fd_1,int flowset_id_fd) {
 
     
     //perform counter decode
-    printf("\nStarting Counter Decode\n");
-    counter_decode(&pure_set,pktCount);
+    // printf("\nStarting Counter Decode\n");
+    // counter_decode(&pure_set,pktCount);
   }
 }
 
