@@ -70,3 +70,4 @@ else:
     for flow in actual_sd: 
         print(f"{flow} {decode(flow)}")
 
+    print(f"\nNumber of decodable flows: {sd_flow_count-len(sd_actual)}")
