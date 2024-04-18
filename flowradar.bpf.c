@@ -1,6 +1,7 @@
 #include "flowradar.h"
 #include "murmur.h"
 #include <arpa/inet.h>
+#include <inttypes.h>
 #include <bpf/bpf_helpers.h>
 #include <linux/bpf.h>
 #include <linux/icmp.h>
@@ -200,6 +201,8 @@ int xdp_parse_flow(struct xdp_md *ctx) {
   struct flowset *flowset_0=bpf_map_lookup_elem(&Flow_set_0,&first);
   struct flowset *flowset_1=bpf_map_lookup_elem(&Flow_set_1,&first);
   
+  bpf_printk("Packet Received");
+
   //start only when flowset_id  and flowsets are initialized
   if(flowset_id_ptr && flowset_0 && flowset_1){
 
@@ -216,7 +219,7 @@ int xdp_parse_flow(struct xdp_md *ctx) {
     }
 
     //expanding network flow to 128 bits (Check:Is is possible without this?)
-    __u128 flow_key;
+    __u128 flow_key = 0;
     memcpy(&flow_key, &nflow, sizeof(struct network_flow));
     
     
@@ -231,7 +234,6 @@ int xdp_parse_flow(struct xdp_md *ctx) {
 
 
     bpf_spin_unlock(&flowset_id_ptr->lock);
-
   }
 
 

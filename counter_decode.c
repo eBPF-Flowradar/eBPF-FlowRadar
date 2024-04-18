@@ -9,22 +9,22 @@
 
 int counter_decode(struct pureset *pure_set, double *pktCount) {
   /*
-      To run CounterDecode on the flowlist. The target is to solve Ax = B where
-     B -> Packet counts and A is a binary matrix
-      */
+    To run CounterDecode on the flowlist. The target is to solve Ax = B where
+    B -> Packet counts and A is a binary matrix
+  */
 
   int num_purecells = pure_set->latest_index;
   
   //gsl_matrix_calloc initializes all elements to zero
-  gsl_matrix *A= gsl_matrix_calloc(COUNTING_TABLE_SIZE, num_purecells);
+  gsl_matrix *A = gsl_matrix_calloc(COUNTING_TABLE_SIZE, num_purecells);
   // Allocate memory for the solution vector x (n x 1)
-  gsl_vector *x= gsl_vector_alloc(num_purecells);
+  gsl_vector *x = gsl_vector_alloc(num_purecells);
   // Allocate memory for B;
-  gsl_vector *B= gsl_vector_alloc(COUNTING_TABLE_SIZE); 
+  gsl_vector *B = gsl_vector_alloc(COUNTING_TABLE_SIZE); 
   // Allocate memory for covariance (is this necessary)
-  gsl_matrix *cov= gsl_matrix_alloc(num_purecells, num_purecells);
+  gsl_matrix *cov = gsl_matrix_alloc(num_purecells, num_purecells);
   // allocate memory for workspace
-  gsl_multifit_linear_workspace *work=gsl_multifit_linear_alloc(COUNTING_TABLE_SIZE, num_purecells);
+  gsl_multifit_linear_workspace *work = gsl_multifit_linear_alloc(COUNTING_TABLE_SIZE, num_purecells);
   
   double chisq;
 
@@ -39,16 +39,15 @@ int counter_decode(struct pureset *pure_set, double *pktCount) {
 
       __u128 flow_id = pure_set->purecells[i];
 
-    for (size_t num_hash = 0; num_hash < COUNTING_TABLE_HASH_COUNT; ++num_hash) {
+      for (size_t num_hash = 0; num_hash < COUNTING_TABLE_HASH_COUNT; ++num_hash) {
+            //generate hash
+          __u32 offset;
+          MurmurHash3_x86_32(&flow_id,16,num_hash,&offset);
+          offset=offset%COUNTING_TABLE_ENTRIES_PER_SLICE;
+          __u32 hashIndex=num_hash*COUNTING_TABLE_ENTRIES_PER_SLICE+offset;
 
-      //generate hash
-      __u32 offset;
-      MurmurHash3_x86_32(&flow_id,16,num_hash,&offset);
-      offset=offset%COUNTING_TABLE_ENTRIES_PER_SLICE;
-      __u32 hashIndex=num_hash*COUNTING_TABLE_ENTRIES_PER_SLICE+offset;
-
-      gsl_matrix_set(A, hashIndex,i,1);
-    }
+          gsl_matrix_set(A, hashIndex,i,1);
+      }
   }
 
   // Copy data from array to gsl_vector
@@ -86,7 +85,7 @@ int counter_decode(struct pureset *pure_set, double *pktCount) {
              (uint64_t)pure_set->purecells[i]);
     fprintf(fptr,"%d\n",(int)round(gsl_vector_get(x,i)));  //rounding off to nearest integer
   }
-
+  fprintf(fptr, "Counter_Decode\n");
   fclose(fptr);
   printf("Write complete\n");
 
