@@ -7,23 +7,24 @@
 6. Ask about hashes are implemented for consistent implementation with theirs
 7. Extra metadata to be stored?  (e.g., packet counters, and the flow starting and finish times).
 8. When should we clear the flowset? In the simulation its done in sequential order. [x]
-9. Currently only testing with TCP and UDP packets. Is that enough?
+9. Currently only testing with TCP and UDP packets. Is that enough?(in simulation other packets are supported by having 0 as src port and destination port. In query only there is support for IPV6(ask if required))
 10. Added ethernet headers to packets using scapy, certain metadata is missing from the packet (flow id and time is maintatined)
 11. How are you guys doing counter decode? In P4 or simulating in python
+12. Sleeping for 280ms is implemented through usleep. Wont be accurate. Is that enough?
 
 # Check
 1. Check all TODOs
 2. Check if memory allocated is deallocated and also proper error checking
 3. Check consistency of hashing (in IITH and our impl)
 4. Verify lsqr solver(partially verified)
-5. Standard values to be used 
+5. Standard values to be used [x]
 6. Concurrency controls - use two flowsets [x]
 7. murmur hash implementations[x]
 8. make time to 280ms[x]
 9. Test with bridging[x]
 10. Test the implementation
 11. Match number of packets in listener and eBPF program[x]
-12. Check pure set implementation
+12. Check pure set implementation[x]
 13. Check better implementation for counter decode [checkout other workspaces](https://www.gnu.org/software/gsl/doc/html/lls.html?highlight=gsl_multifit_linear)
 
 # Things Need to be done
@@ -38,6 +39,8 @@
 7. Prevent random packets sent on interface
 8. Proper flow for returning errors.Check return values of bpf helpers and perform required action
 9. Remove timestamp from counter decode output
+10. Create a folder structure
+11. Add support for packets other than TCP and UDP
 
 # Errors
 1. Errors due to empty flowsets being passed down to gsl [x]
