@@ -230,7 +230,7 @@ int main(int argc, char *argv[]) {
   remove(SINGLE_DECODE_LOG_FILE);
   remove(COUNTER_DECODE_LOG_FILE);
 
-
+  printf("\nStarting Decode\n");
   start_decode(Flowset_fd_0,Flowset_fd_1,Flowset_id_fd);
 
   int_exit(0);
