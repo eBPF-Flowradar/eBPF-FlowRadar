@@ -149,11 +149,11 @@ int xdp_parse_flow(struct xdp_md *ctx) {
   // Source and Destination IP Address
   __u32 source_ip = ip->saddr;
   __u32 dest_ip = ip->daddr;
-  __u32 protocol = ip->protocol;
+  __u8 protocol = ip->protocol;
 
-  // Initializing the port data to 0 (in case of non TCP/UDP or fragmented IP packets);
-  __u32 source_port=0;
-  __u32 dest_port=0;
+
+  __u16 source_port;
+  __u16 dest_port;
 
   if (ip->protocol == IPPROTO_TCP && data + sizeof(struct ethhdr) + sizeof(struct iphdr) +
             sizeof(struct tcphdr) <=
@@ -171,7 +171,12 @@ int xdp_parse_flow(struct xdp_md *ctx) {
         source_port = udp->source;
         dest_port = udp->dest;
 
-    }
+    }else{
+
+      //in case of non TCP/UDP or fragmented IP packets
+      source_port=0;
+      dest_port=0;
+  }
 
 
   struct network_flow nflow = (struct network_flow){.source_ip = source_ip,
