@@ -165,18 +165,7 @@ def generate_malicious_flows(input_file: str, mal_flow_count: int, flow_filter:f
         proto = random.choice(protocols)
 
         flow = [ran_ip_src, ran_ip_dst, ran_port_src, ran_port_dst, proto]
-        print(f"Generated Flow {flow}")
-        key = list(convert_to_hex(flow).keys())[0]
-        print(key)
-        if flow_filter.all_bit_unset(key) is True:
-            if key not in polluting_items:
-                item_pool.append(flow)
-                print(flow)
-                polluting_items.append(key)
-                print(key)
-                flow_filter.insert_into_flow_filter(key)
-            else:
-                break
+        item_pool.append(flow)
     return item_pool
 
 
@@ -184,7 +173,7 @@ def parse_args():
     parser = ArgumentParser()
     parser.add_argument('--pcap', type=str, help="File Name for Pcap file generation", default='')
     parser.add_argument('--percent_malflows', type=int, help="Percentage of Malicious Flows to be Generated",default=0)
-    parser.add_argument('--output_file', type=str, help="Output file where packets are stored", default='cia.pcap')
+    parser.add_argument('--output_file', type=str, help="Output file where packets are stored", default='qoa.pcap')
     args = parser.parse_args()
     return args
 
