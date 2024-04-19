@@ -13,6 +13,7 @@
 12. Sleeping for 280ms is implemented through usleep. Wont be accurate. Is that enough?
 13. Currently packets gets inserted into 2 or 3 flowsets. Should all packets be inserted into the same flowset?
 14. How are you guys dealing with fragmented IP packets? (packet 34 in pcap UDP with src/dst port=0)(when these packets are considered the flow count becomes as you said :24089)
+15. Pureflows (7359) when flows in a single flowset (Error :#3)
 
 # Check
 1. Check all TODOs
@@ -49,6 +50,7 @@
 # Errors
 1. Errors due to empty flowsets being passed down to gsl [x]
 2. -O2,-O3 flags causes pureset_latest_index to exceed  PURESET_SIZE
+3. When trying to have all packets into a single flowset by increasing the poll time the number of pureflows is very less (7359)
 
 # Important Commands
 1.`sudo ip link set dev enp7s0  xdpgeneric off` : To unload XDP program from enp7s0 interface

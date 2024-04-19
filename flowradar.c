@@ -47,11 +47,6 @@ static void start_decode(int flowset_fd_0,int flowset_fd_1,int flowset_id_fd) {
     //Collect data at poll interval
     usleep(POLL_TIME_US);
 
-
-    //variable to store whether the counting table is empty or not
-    //TODO:Can this be more efficient (to check whether ct_empty)
-    bool ct_empty=true; 
-
     loop++;
     printf("\nPoll No : %d\n", loop);
     
@@ -86,29 +81,29 @@ static void start_decode(int flowset_fd_0,int flowset_fd_1,int flowset_id_fd) {
     printf("Getting the flowset from kernel space\n");
     bpf_map_lookup_elem(curr_flowset_fd,&first,&flow_set);
 
+    if(flow_set.pkt_count==0){
+      printf("Flowset empty!!!\n");
+      continue;
+    }
+
+    
     // printf("FlowXOR ,FlowCount ,PacketCount\n");
     for(int i=0;i<COUNTING_TABLE_SIZE;i++){
 
       struct counting_table_entry cte=flow_set.counting_table[i];
       pktCount[i]=cte.packetCount;
 
-      if(cte.flowXOR){
-         ct_empty=false;
+      // if(cte.flowXOR){
+      
         // printf("%" PRIx64 "%016" PRIx64, (uint64_t)(cte.flowXOR >> 64),
         //       (uint64_t)cte.flowXOR);
         // printf(" ,%d ,%d\n", cte.flowCount, cte.packetCount);
-      }
+      // }
 
     }
 
 
-
-    //Continue the loop if counting table is empty
-    if(ct_empty){
-      printf("Counting table empty!!!\n");
-      continue;
-    }
-
+    printf("Number of packets in flowset:%d\n",flow_set.pkt_count);
 
     //reset the flowset 
     printf("Reset the flowset in kernel space\n");

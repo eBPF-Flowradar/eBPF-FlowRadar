@@ -40,6 +40,7 @@ struct counting_table_entry {
 struct flowset {
   struct counting_table_entry counting_table[COUNTING_TABLE_SIZE];
   bool flow_filter[FLOW_FILTER_SIZE];
+  int pkt_count;
 };
 
 struct flowset_id_struct{

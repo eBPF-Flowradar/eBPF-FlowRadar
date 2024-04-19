@@ -222,7 +222,7 @@ int xdp_parse_flow(struct xdp_md *ctx) {
     }
 
     insert_flow_to_counting_table(flow_key, old_flow,curr_flowset);
-
+    curr_flowset->pkt_count++;
 
     bpf_spin_unlock(&flowset_id_ptr->lock);
 
