@@ -151,42 +151,27 @@ int xdp_parse_flow(struct xdp_md *ctx) {
   __u32 dest_ip = ip->daddr;
   __u32 protocol = ip->protocol;
 
-  // Extracting the port data;
-  __u32 source_port;
-  __u32 dest_port;
+  // Initializing the port data to 0 (in case of non TCP/UDP or fragmented IP packets);
+  __u32 source_port=0;
+  __u32 dest_port=0;
 
-  if (ip->protocol == IPPROTO_TCP) {
-
-    if (data + sizeof(struct ethhdr) + sizeof(struct iphdr) +
-            sizeof(struct tcphdr) >
+  if (ip->protocol == IPPROTO_TCP && data + sizeof(struct ethhdr) + sizeof(struct iphdr) +
+            sizeof(struct tcphdr) <=
         data_end) {
-      return XDP_PASS;
-    }
+      
+      struct tcphdr *tcp = data + sizeof(struct ethhdr) + sizeof(struct iphdr);
+      source_port = tcp->source;
+      dest_port = tcp->dest;
 
-    struct tcphdr *tcp = data + sizeof(struct ethhdr) + sizeof(struct iphdr);
-    source_port = tcp->source;
-    dest_port = tcp->dest;
-
-  } else if (ip->protocol == IPPROTO_UDP) {
-
-    if (data + sizeof(struct ethhdr) + sizeof(struct iphdr) +
-            sizeof(struct udphdr) >
+  } else if (ip->protocol == IPPROTO_UDP && data + sizeof(struct ethhdr) + sizeof(struct iphdr) +
+            sizeof(struct udphdr) <=
         data_end) {
-      return XDP_PASS;
+
+        struct udphdr *udp = data + sizeof(struct ethhdr) + sizeof(struct iphdr);
+        source_port = udp->source;
+        dest_port = udp->dest;
+
     }
-
-    struct udphdr *udp = data + sizeof(struct ethhdr) + sizeof(struct iphdr);
-    source_port = udp->source;
-    dest_port = udp->dest;
-
-  } else {
-
-    //doing the same as iith code
-    //if not udp or tcp set source_port and dest_port as zero
-    source_port=0;
-    dest_port=0;
-
-  }
 
 
   struct network_flow nflow = (struct network_flow){.source_ip = source_ip,

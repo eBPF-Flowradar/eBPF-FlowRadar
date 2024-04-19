@@ -12,6 +12,7 @@
 11. How are you guys doing counter decode? In P4 or simulating in python
 12. Sleeping for 280ms is implemented through usleep. Wont be accurate. Is that enough?
 13. Currently packets gets inserted into 2 or 3 flowsets. Should all packets be inserted into the same flowset?
+14. How are you guys dealing with fragmented IP packets? (packet 34 in pcap UDP with src/dst port=0)(when these packets are considered the flow count becomes as you said :24089)
 
 # Check
 1. Check all TODOs
@@ -41,8 +42,9 @@
 8. Proper flow for returning errors.Check return values of bpf helpers and perform required action
 9. Remove timestamp from counter decode output
 10. Create a folder structure
-11. Add support for packets other than TCP and UDP (maybe also IPv6)
+11. Add support for packets other than TCP and UDP[x]
 12. Remove unwanted memcpy to 128 bit before insertion
+13. Support for IPv6?
 
 # Errors
 1. Errors due to empty flowsets being passed down to gsl [x]
