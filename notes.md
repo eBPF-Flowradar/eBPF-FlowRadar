@@ -41,7 +41,8 @@
 8. Proper flow for returning errors.Check return values of bpf helpers and perform required action
 9. Remove timestamp from counter decode output
 10. Create a folder structure
-11. Add support for packets other than TCP and UDP
+11. Add support for packets other than TCP and UDP (maybe also IPv6)
+12. Remove unwanted memcpy to 128 bit before insertion
 
 # Errors
 1. Errors due to empty flowsets being passed down to gsl [x]

@@ -4,15 +4,15 @@ import struct
 import pickle
 
 """
-Currently only TCP and UDP packets are being tested
+Currently only IPv4 packets are tested
 """
 
 
 IP="IP"
 TCP="TCP"
 UDP="UDP"
-IPPROTO_TCP=6
-IPPROTO_UDP=17
+# IPPROTO_TCP=6
+# IPPROTO_UDP=17
 PCAP_FILE="./110k_24k_caida.pcap"
 PKL_FILE="flows.pkl"
 
@@ -30,14 +30,17 @@ def flow_id_from_packet(packet):
         if TCP in packet:
             values.append(packet[TCP].sport)
             values.append(packet[TCP].dport)
-            values.append(IPPROTO_TCP)
+            # values.append(IPPROTO_TCP)
         elif UDP in packet:
             values.append(packet[UDP].sport)
             values.append(packet[UDP].dport)
-            values.append(IPPROTO_UDP)
+            # values.append(IPPROTO_UDP)
         else:
-            return
+            values.append(0)
+            values.append(0)
 
+        #append the transport layer protocol
+        values.append(packet[IP].proto)
         values.reverse()
         raw_bytes=struct.pack(format_string,*values)
         hex_value=raw_bytes.hex().lstrip('0')  #to match with log from ebpf program

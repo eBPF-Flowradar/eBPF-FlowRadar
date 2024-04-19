@@ -29,7 +29,7 @@ def decode(flow_string:str):
     elif protocol==IPPROTO_UDP:
         flow["protocol"]=UDP
     else:
-        flow["protocol"]="unknown"
+        flow["protocol"]=protocol
 
     return flow
 
@@ -70,4 +70,7 @@ else:
     print(f"Number of undecodable flows: {len(sniff_sd)}")
     for flow in sniff_sd: 
         print(f"{flow} {decode(flow)}")
+    
+    print(f"\nNumber of decodable flows: {sd_flow_count-len(sd_sniff)}")
+
 

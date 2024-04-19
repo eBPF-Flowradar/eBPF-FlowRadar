@@ -9,8 +9,8 @@ import os
 IP="IP"
 TCP="TCP"
 UDP="UDP"
-IPPROTO_TCP=6
-IPPROTO_UDP=17
+# IPPROTO_TCP=6
+# IPPROTO_UDP=17
 LOG_FILE="sniff.csv"
 
 #format_string='<IIHHB'
@@ -27,14 +27,16 @@ def packet_callback(packet):
         if TCP in packet:
             values.append(packet[TCP].sport)
             values.append(packet[TCP].dport)
-            values.append(IPPROTO_TCP)
+            # values.append(IPPROTO_TCP)
         elif UDP in packet:
             values.append(packet[UDP].sport)
             values.append(packet[UDP].dport)
-            values.append(IPPROTO_UDP)
+            # values.append(IPPROTO_UDP)
         else:
-            return
-
+            values.append(0)
+            values.append(0)
+            
+        values.append(packet[IP].proto)
         values.reverse()
         raw_bytes=struct.pack(format_string,*values)
         hex_value=raw_bytes.hex().lstrip('0')  #to match with log from ebpf program
@@ -45,6 +47,7 @@ def packet_callback(packet):
         with open(LOG_FILE,"a") as file:
             file.write(f"{int(time())},{hex_value}\n")
 
+    return None
 #        print(packet.summary())
 
 #delete the previous log file if it exists

@@ -135,7 +135,7 @@ int xdp_parse_flow(struct xdp_md *ctx) {
 
   h_proto = eth->h_proto;
 
-  // Packet is not IP Packet
+  // Packet is not IP Packet (only IPv4 currently supported)
   if (h_proto != htons(ETH_P_IP)) {
     return XDP_PASS;
   }
@@ -152,8 +152,8 @@ int xdp_parse_flow(struct xdp_md *ctx) {
   __u32 protocol = ip->protocol;
 
   // Extracting the port data;
-  __u32 source_port = 0;
-  __u32 dest_port = 0;
+  __u32 source_port;
+  __u32 dest_port;
 
   if (ip->protocol == IPPROTO_TCP) {
 
@@ -181,7 +181,11 @@ int xdp_parse_flow(struct xdp_md *ctx) {
 
   } else {
 
-    return XDP_PASS;
+    //doing the same as iith code
+    //if not udp or tcp set source_port and dest_port as zero
+    source_port=0;
+    dest_port=0;
+
   }
 
 

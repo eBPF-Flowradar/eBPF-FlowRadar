@@ -29,7 +29,7 @@ def decode(flow_string:str):
     elif protocol==IPPROTO_UDP:
         flow["protocol"]=UDP
     else:
-        flow["protocol"]="unknown"
+        flow["protocol"]=protocol
 
     return flow
 

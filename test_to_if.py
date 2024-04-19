@@ -24,7 +24,7 @@ for packet in packets:
     if num_packets==100:
         break
 
-    if IP in packet and (TCP in packet or UDP in packet):
+    if IP in packet:
         packet=ethernet_header/packet
         print(packet.summary())
         sendp(packet, iface=interface)
