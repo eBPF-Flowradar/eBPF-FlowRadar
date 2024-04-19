@@ -13,6 +13,7 @@ import pickle
 import timeit
 import numpy as np
 import sys
+import json
 import csv
 import argparse
 from copy import deepcopy
@@ -20,6 +21,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scapy.layers.l2 import Ether
 from scapy.all import *
+from argparse import ArgumentParser
 
 import time
 import tracemalloc
@@ -80,6 +82,7 @@ class flow_filter:
         for h in hashes:
             self.ff[h] = True
 
+
 def convert_to_hex(data):
 	"""
 		INPUT: Pandas.DataFrame OR list() as input.
@@ -133,9 +136,8 @@ def convert_to_hex(data):
 
 	return flow_details
 
+
 def generate_malicious_flows(input_file: str, mal_flow_count: int, flow_filter:flow_filter):
-    file = open('attack_generator/mal_flows.csv','a')
-    writer = csv.writer(file);
     source_ips = []
     dest_ips = []
     protocols = [6, 17]
@@ -168,28 +170,44 @@ def generate_malicious_flows(input_file: str, mal_flow_count: int, flow_filter:f
         print(key)
         if flow_filter.all_bit_unset(key) is True:
             if key not in polluting_items:
-                writer.writerow(flow)
+                item_pool.append(flow)
                 print(flow)
                 polluting_items.append(key)
                 print(key)
                 flow_filter.insert_into_flow_filter(key)
             else:
                 break
-    file.close()
-    return polluting_items
+    return item_pool
 
+
+def parse_args():
+    parser = ArgumentParser()
+    parser.add_argument('--pcap', type=str, help="File Name for Pcap file generation", default='')
+    parser.add_argument('--percent_malflows', type=int, help="Percentage of Malicious Flows to be Generated",default=0)
+
+    args = parser.parse_args()
+    return args
 
 if __name__ == '__main__':
     
+
     ff = flow_filter(FLOW_FILTER_SIZE, FLOW_FILTER_SIZE/7, 7)
-    # generate_malicious_flows('univ_pt1/univ1_pt1.pcap', 100000,ff)
-    flow_file = open('attack_generator/mal_flows.csv')
-    flow_reader = csv.reader(flow_file)
-    output_file = PcapWriter('attack_generator/modified.pcap', append=True)
-    packets = PcapReader('univ_pt1/univ1_pt1.pcap')
-    output = []
+    args = parse_args()
     
-    for flow in flow_reader:
+    file_meta_data = json.load(open('attack_generator/pcap_metadata.json'))
+
+    file_name = args.pcap
+    mal_flow_pct = args.percent_malflows
+    mal_flow_count = args.percent_malflows/100 * file_meta_data[file_name]
+
+    output_flows =generate_malicious_flows(file_name, mal_flow_count,ff
+                             )
+    output_file = PcapWriter('attack_generator/modified.pcap', append=True)
+    packets = PcapReader(filename=file_name)
+    output = []
+    timestamp = time.time()
+
+    for flow in output_flows:
         print(flow)
         ip_packet = IP(src=flow[0], dst= flow[1])          
         packet = None
@@ -201,8 +219,6 @@ if __name__ == '__main__':
         elif flow[4] == '17':
             tcp_packet = UDP(sport=int(flow[2]), dport=int(flow[3]))
             packet = Ether(src="00:11:22:33:44:55", dst="66:77:88:99:aa:bb") / ip_packet / tcp_packet
-
-
         if packet != None:
             print(packet.summary())
             output.append(packet)
@@ -212,6 +228,12 @@ if __name__ == '__main__':
     
     random.shuffle(output)
 
-    for opt in output:
-         output_file.write(opt)
+    timed_output = []
+    for pkt in output:
+        pkt.time = timestamp;
+        timestamp += random.randint(1,40)/1000000
+        timed_output.append(pkt)
+
+    output_file.write(timed_output)
+
 
