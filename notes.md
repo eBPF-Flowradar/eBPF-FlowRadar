@@ -7,13 +7,13 @@
 6. Ask about hashes are implemented for consistent implementation with theirs
 7. Extra metadata to be stored?  (e.g., packet counters, and the flow starting and finish times).
 8. When should we clear the flowset? In the simulation its done in sequential order. [x]
-9. Currently only testing with TCP and UDP packets. Is that enough?(in simulation other packets are supported by having 0 as src port and destination port. In query only there is support for IPV6(ask if required only 2 IPv6 packets in pcap file))
+9. Should there be IPv6 support?
 10. Added ethernet headers to packets using scapy, certain metadata is missing from the packet (flow id and time is maintatined)
 11. How are you guys doing counter decode? In P4 or simulating in python
 12. Sleeping for 280ms is implemented through usleep. Wont be accurate. Is that enough?
 13. Currently packets gets inserted into 2 or 3 flowsets. Should all packets be inserted into the same flowset?
 14. How are you guys dealing with fragmented IP packets? (packet 34 in pcap UDP with src/dst port=0)(when these packets are considered the flow count becomes as you said :24089)
-15. Pureflows (7359) when flows in a single flowset (Error :#3)
+15. Pureflows (7359) when flows in a single flowset (Error :#3)[x]
 
 # Check
 1. Check all TODOs
@@ -50,7 +50,7 @@
 # Errors
 1. Errors due to empty flowsets being passed down to gsl [x]
 2. -O2,-O3 flags causes pureset_latest_index to exceed  PURESET_SIZE
-3. When trying to have all packets into a single flowset by increasing the poll time the number of pureflows is very less (7359)
+3. When trying to have all packets into a single flowset by increasing the poll time the number of pureflows is very less (7359)[x](Solved when sizes updated to sizes in simulation)
 
 # Important Commands
 1.`sudo ip link set dev enp7s0  xdpgeneric off` : To unload XDP program from enp7s0 interface
@@ -62,7 +62,7 @@
 
 # Notes
 1. The 110k_24k_caida.pcap has raw ip packets without the ethernet header, this causes issues with our program as it expects ethernet headers, currently while testing with scapy we are adding the ethernet headers and sending to the interface.
-2. Only supporting IP packets (TCP and UDP)
+2. Only supporting IP packets (no IPv6)
 3. Counter decode done with gsl library.Packets rounded to nearest integer after calculation (instead of simplifying the calculation)
 
 # Resources to setup veth
