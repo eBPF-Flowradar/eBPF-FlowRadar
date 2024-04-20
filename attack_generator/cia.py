@@ -200,7 +200,7 @@ if __name__ == '__main__':
     mal_flow_pct = args.percent_malflows
     mal_flow_count = args.percent_malflows/100 * file_meta_data[file_name]
 
-    output_flows =generate_malicious_flows(file_name, mal_flow_count,ff
+    output_flows = generate_malicious_flows(file_name, mal_flow_count,ff
                              )
     output_file = PcapWriter(f'attack_generator/{args.output_file}', append=True)
     packets = PcapReader(filename=file_name)
@@ -212,20 +212,21 @@ if __name__ == '__main__':
         ip_packet = IP(src=flow[0], dst= flow[1])          
         packet = None
     
-        if flow[4] == '6':
+        if flow[4] == 6:
             tcp_packet = TCP(sport=int(flow[2]), dport=int(flow[3]))
             packet = Ether(src="00:11:22:33:44:55", dst="66:77:88:99:aa:bb") / ip_packet / tcp_packet
 
-        elif flow[4] == '17':
+        elif flow[4] == 17:
             tcp_packet = UDP(sport=int(flow[2]), dport=int(flow[3]))
             packet = Ether(src="00:11:22:33:44:55", dst="66:77:88:99:aa:bb") / ip_packet / tcp_packet
         if packet != None:
             print(packet.summary())
             output.append(packet)
-    
+    '''
     for pkt in packets:
         output.append(pkt)
-    
+    '''
+
     random.shuffle(output)
 
     timed_output = []
