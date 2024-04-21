@@ -66,8 +66,16 @@ else:
     for flow in sd_actual: 
         print(f"{flow} {decode(flow)}")
 
-    print(f"\nNumber of undecodable flows: {len(actual_sd)}")
+    undec_num=len(actual_sd)
+    print(f"\nNumber of undecodable flows: {undec_num}")
     for flow in actual_sd: 
         print(f"{flow} {decode(flow)}")
 
-    print(f"\nNumber of decodable flows: {sd_flow_count-len(sd_actual)}")
+    dec_num=sd_flow_count-len(sd_actual)
+    print(f"\nNumber of decodable flows: {dec_num}")
+
+    undec_percent=(undec_num/actual_flow_count)*100
+    dec_percent=(dec_num/actual_flow_count)*100
+
+    print(f"\nDecodable flows% :{dec_percent}")
+    print(f"Undecodable flows% :{undec_percent}")

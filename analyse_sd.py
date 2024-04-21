@@ -67,10 +67,18 @@ else:
     for flow in sd_sniff: 
         print(f"{flow} {decode(flow)}")
 
-    print(f"Number of undecodable flows: {len(sniff_sd)}")
+    undec_num=len(sniff_sd)
+    print(f"Number of undecodable flows: {undec_num}")
     for flow in sniff_sd: 
         print(f"{flow} {decode(flow)}")
     
-    print(f"\nNumber of decodable flows: {sd_flow_count-len(sd_sniff)}")
+    dec_num=sd_flow_count-len(sd_sniff)
+    print(f"\nNumber of decodable flows: {dec_num}")
+
+    undec_percent=(undec_num/sniff_flow_count)*100
+    dec_percent=(dec_num/sniff_flow_count)*100
+
+    print(f"\nDecodable flows% :{dec_percent}")
+    print(f"Undecodable flows% :{undec_percent}")
 
 
