@@ -232,32 +232,8 @@ if __name__ == '__main__':
     
     for pkt in packets:
         eth_header = Ether(src="00:11:22:33:44:55", dst="66:77:88:99:aa:bb")
-        new_pkt = None
-        if IPx in pkt:
-            ip_packet = IP(src=pkt[IPx].src, dst=pkt[IPx].dst)
-            if TCPx in pkt:
-                tcp_packet = TCP(sport=pkt[TCPx].sport, dport=pkt[TCPx].dport)
-                new_pkt = eth_header / ip_packet / tcp_packet
-
-            elif UDPx in pkt:
-                udp_packet = UDP(sport=pkt[UDPx].sport, dport=pkt[UDPx].dport)
-                new_pkt = eth_header / ip_packet / udp_packet
-
-            elif ESPx in pkt:
-                 esp_packet = ESP()
-                 new_pkt = eth_header / ip_packet / esp_packet
-            elif ICMPx in pkt:
-                 icmp_packet = ICMP()
-                 new_pkt = eth_header / ip_packet / icmp_packet
-            elif GREx in pkt:
-                 gre_packet  = GRE()
-                 new_pkt = eth_header / ip_packet / gre_packet
-            elif RSVPx in pkt:
-                 rsvp_pkt = RSVP()
-                 new_pkt = eth_header / ip_packet / rsvp_pkt
-            
-        if new_pkt != None:                
-            output.append(new_pkt)
+        new_pkt = eth_header / pkt
+        output.append(new_pkt)
 
     random.shuffle(output)
 
