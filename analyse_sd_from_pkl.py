@@ -77,5 +77,5 @@ else:
     undec_percent=(undec_num/actual_flow_count)*100
     dec_percent=(dec_num/actual_flow_count)*100
 
-    print(f"\nDecodable flows% :{dec_percent}")
-    print(f"Undecodable flows% :{undec_percent}")
+    print(f"\nDecodable flows :{dec_percent}%")
+    print(f"Undecodable flows :{undec_percent}%")
