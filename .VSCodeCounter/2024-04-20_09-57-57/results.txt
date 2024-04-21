@@ -1,0 +1,50 @@
+Date : 2024-04-20 09:57:57
+Directory : /home/rajesh/eBPF/eBPF-FlowRadar
+Total : 18 files,  1087 codes, 140 comments, 409 blanks, all 1636 lines
+
+Languages
++--------------+------------+------------+------------+------------+------------+
+| language     | files      | code       | comment    | blank      | total      |
++--------------+------------+------------+------------+------------+------------+
+| Python       |          6 |        518 |         32 |        167 |        717 |
+| C            |          4 |        371 |         80 |        171 |        622 |
+| CUDA C++     |          2 |        111 |         23 |         50 |        184 |
+| Markdown     |          2 |         54 |          0 |          9 |         63 |
+| Shell Script |          2 |         21 |          5 |          9 |         35 |
+| Makefile     |          1 |          7 |          0 |          3 |         10 |
+| JSON         |          1 |          5 |          0 |          0 |          5 |
++--------------+------------+------------+------------+------------+------------+
+
+Directories
++----------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                                 | files      | code       | comment    | blank      | total      |
++----------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                                    |         18 |      1,087 |        140 |        409 |      1,636 |
+| . (Files)                                                            |         15 |        716 |        128 |        315 |      1,159 |
+| attack_generator                                                     |          3 |        371 |         12 |         94 |        477 |
++----------------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++----------------------------------------------------------------------+--------------+------------+------------+------------+------------+
+| filename                                                             | language     | code       | comment    | blank      | total      |
++----------------------------------------------------------------------+--------------+------------+------------+------------+------------+
+| /home/rajesh/eBPF/eBPF-FlowRadar/Makefile                            | Makefile     |          7 |          0 |          3 |         10 |
+| /home/rajesh/eBPF/eBPF-FlowRadar/README.md                           | Markdown     |          1 |          0 |          2 |          3 |
+| /home/rajesh/eBPF/eBPF-FlowRadar/add_eth.py                          | Python       |         28 |          8 |         10 |         46 |
+| /home/rajesh/eBPF/eBPF-FlowRadar/analyse.py                          | Python       |         72 |          4 |         36 |        112 |
+| /home/rajesh/eBPF/eBPF-FlowRadar/analyse.sh                          | Shell Script |         13 |          4 |          8 |         25 |
+| /home/rajesh/eBPF/eBPF-FlowRadar/attack_generator/cia.py             | Python       |        189 |          6 |         46 |        241 |
+| /home/rajesh/eBPF/eBPF-FlowRadar/attack_generator/pcap_metadata.json | JSON         |          5 |          0 |          0 |          5 |
+| /home/rajesh/eBPF/eBPF-FlowRadar/attack_generator/qoa.py             | Python       |        177 |          6 |         48 |        231 |
+| /home/rajesh/eBPF/eBPF-FlowRadar/counter_decode.c                    | C            |         59 |         20 |         22 |        101 |
+| /home/rajesh/eBPF/eBPF-FlowRadar/flowradar.bpf.c                     | C            |        159 |         17 |         68 |        244 |
+| /home/rajesh/eBPF/eBPF-FlowRadar/flowradar.c                         | C            |        116 |         39 |         56 |        211 |
+| /home/rajesh/eBPF/eBPF-FlowRadar/flowradar.h                         | CUDA C++     |         39 |          1 |         15 |         55 |
+| /home/rajesh/eBPF/eBPF-FlowRadar/listen.py                           | Python       |         33 |          4 |         15 |         52 |
+| /home/rajesh/eBPF/eBPF-FlowRadar/murmur.h                            | CUDA C++     |         72 |         22 |         35 |        129 |
+| /home/rajesh/eBPF/eBPF-FlowRadar/notes.md                            | Markdown     |         53 |          0 |          7 |         60 |
+| /home/rajesh/eBPF/eBPF-FlowRadar/setup_veth.sh                       | Shell Script |          8 |          1 |          1 |         10 |
+| /home/rajesh/eBPF/eBPF-FlowRadar/single_decode.c                     | C            |         37 |          4 |         25 |         66 |
+| /home/rajesh/eBPF/eBPF-FlowRadar/test_to_if.py                       | Python       |         19 |          4 |         12 |         35 |
+| Total                                                                |              |      1,087 |        140 |        409 |      1,636 |
++----------------------------------------------------------------------+--------------+------------+------------+------------+------------+

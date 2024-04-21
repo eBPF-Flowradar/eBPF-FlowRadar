@@ -1,21 +1,9 @@
-import math
-import zlib
-import hashlib
 import mmh3 #Murmur3 Hash function.
 from struct import unpack, pack, calcsize
 import bitarray
-import struct
 import random
-import socket
-import binascii
-import string
-import pickle
-import timeit
 import numpy as np
-import sys
 import json
-import csv
-import argparse
 from copy import deepcopy
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -24,11 +12,33 @@ from scapy.all import *
 from argparse import ArgumentParser
 
 import time
-import tracemalloc
 
 IPx = "IP"
 TCPx = "TCP"
 UDPx = "UDP"
+ESPx = 'ESP'
+GREx = 'GRE'
+ICMPx = 'ICMP'
+IPv4x = 'IPv4'
+RSVPx = 'RSVP'
+def count_unique_flows(filename):
+    packets = PcapReader(filename=filename)
+    flow_set = set()
+    source_ips = set()
+    dest_ips = set()
+    for pkt in packets:
+        if IPx in pkt:
+
+            source_ips.add(pkt[IPx].src)
+            dest_ips.add(pkt[IPx].dst)
+
+            if TCPx in pkt:
+                flow_set.add((pkt[IPx].src, pkt[IPx].dst, pkt[TCPx].sport, pkt[TCPx].dport, 6))
+            if UDPx in pkt:
+                flow_set.add((pkt[IPx].src, pkt[IPx].dst, pkt[UDPx].sport, pkt[UDPx].dport, 17))
+    
+    print(f"Number of Unique_packets: {len(flow_set)}")
+    return len(flow_set), list(source_ips), list(dest_ips)
 
 try:
 	import bitarray
@@ -137,9 +147,7 @@ def convert_to_hex(data):
 	return flow_details
 
 
-def generate_malicious_flows(input_file: str, mal_flow_count: int, flow_filter:flow_filter):
-    source_ips = []
-    dest_ips = []
+def generate_malicious_flows(input_file: str, mal_flow_count: int, flow_filter:flow_filter, source_ips: list, dest_ips: list):
     protocols = [6, 17]
     count = 0;
     with PcapReader(filename=input_file) as packets:
@@ -165,6 +173,9 @@ def generate_malicious_flows(input_file: str, mal_flow_count: int, flow_filter:f
         proto = random.choice(protocols)
 
         flow = [ran_ip_src, ran_ip_dst, ran_port_src, ran_port_dst, proto]
+        print(f"Generated Flow {flow}")
+        key = list(convert_to_hex(flow).keys())[0]
+        polluting_items.append(key)
         item_pool.append(flow)
     return item_pool
 
@@ -172,7 +183,7 @@ def generate_malicious_flows(input_file: str, mal_flow_count: int, flow_filter:f
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument('--pcap', type=str, help="File Name for Pcap file generation", default='')
-    parser.add_argument('--percent_malflows', type=int, help="Percentage of Malicious Flows to be Generated",default=0)
+    parser.add_argument('--percent_malflows', type=float, help="Percentage of Malicious Flows to be Generated",default=0)
     parser.add_argument('--output_file', type=str, help="Output file where packets are stored", default='qoa.pcap')
     args = parser.parse_args()
     return args
@@ -187,36 +198,67 @@ if __name__ == '__main__':
 
     file_name = args.pcap
     mal_flow_pct = args.percent_malflows
-    mal_flow_count = args.percent_malflows/100 * file_meta_data[file_name]
+    unique_flows, source_ips, dest_ips = count_unique_flows(filename=file_name)
+    mal_flow_count = args.percent_malflows/100 * unique_flows
 
-    output_flows = generate_malicious_flows(file_name, mal_flow_count,ff
-                             )
-    output_file = PcapWriter(f'attack_generator/{args.output_file}', append=True)
+    output_flows = generate_malicious_flows(file_name, mal_flow_count,ff, source_ips=source_ips, dest_ips=dest_ips)
+    output_file = PcapWriter(f'attack_generator/qoa/{args.output_file}', append=True)
     packets = PcapReader(filename=file_name)
     output = []
     timestamp = time.time()
 
     for flow in output_flows:
         print(flow)
+        
         ip_packet = IP(src=flow[0], dst= flow[1])          
         packet = None
-    
-        if flow[4] == 6:
-            tcp_packet = TCP(sport=int(flow[2]), dport=int(flow[3]))
-            packet = Ether(src="00:11:22:33:44:55", dst="66:77:88:99:aa:bb") / ip_packet / tcp_packet
+        num_packets = random.randint(1,60)
+  
+        for i in range(num_packets):
+            
+            if int(flow[4]) == 6:
+                tcp_packet = TCP(sport=int(flow[2]), dport=int(flow[3]))
+                eth_header = Ether(src="00:11:22:33:44:55", dst="66:77:88:99:aa:bb")
+                packet = eth_header / ip_packet / tcp_packet
 
-        elif flow[4] == 17:
-            tcp_packet = UDP(sport=int(flow[2]), dport=int(flow[3]))
-            packet = Ether(src="00:11:22:33:44:55", dst="66:77:88:99:aa:bb") / ip_packet / tcp_packet
-        if packet != None:
-            print(packet.summary())
-            output.append(packet)
+            elif int(flow[4]) == 17:
+                tcp_packet = UDP(sport=int(flow[2]), dport=int(flow[3]))
+                eth_header = Ether(src="00:11:22:33:44:55", dst="66:77:88:99:aa:bb")
+                packet = eth_header / ip_packet / tcp_packet
+            
+            if packet != None:
+                print(packet.summary())
+                output.append(packet)        
     
-    print(output)
-
     for pkt in packets:
-        output.append(pkt)
-    
+        eth_header = Ether(src="00:11:22:33:44:55", dst="66:77:88:99:aa:bb")
+        new_pkt = None
+        if IPx in pkt:
+            ip_packet = IP(src=pkt[IPx].src, dst=pkt[IPx].dst)
+            if TCPx in pkt:
+                tcp_packet = TCP(sport=pkt[TCPx].sport, dport=pkt[TCPx].dport)
+                new_pkt = eth_header / ip_packet / tcp_packet
+
+            elif UDPx in pkt:
+                udp_packet = UDP(sport=pkt[UDPx].sport, dport=pkt[UDPx].dport)
+                new_pkt = eth_header / ip_packet / udp_packet
+
+            elif ESPx in pkt:
+                 esp_packet = ESP()
+                 new_pkt = eth_header / ip_packet / esp_packet
+            elif ICMPx in pkt:
+                 icmp_packet = ICMP()
+                 new_pkt = eth_header / ip_packet / icmp_packet
+            elif GREx in pkt:
+                 gre_packet  = GRE()
+                 new_pkt = eth_header / ip_packet / gre_packet
+            elif RSVPx in pkt:
+                 rsvp_pkt = RSVP()
+                 new_pkt = eth_header / ip_packet / rsvp_pkt
+            
+        if new_pkt != None:                
+            output.append(new_pkt)
+
     random.shuffle(output)
 
     timed_output = []
