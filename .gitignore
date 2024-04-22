@@ -7,7 +7,7 @@ venv/
 results/
 univ_pt1/
 .pcap
-.zip
+*.zip
 qoa/
 cia/
 .VScodeCounter/
