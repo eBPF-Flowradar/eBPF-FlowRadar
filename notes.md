@@ -14,6 +14,8 @@
 13. Currently packets gets inserted into 2 or 3 flowsets. Should all packets be inserted into the same flowset?
 14. How are you guys dealing with fragmented IP packets? (packet 34 in pcap UDP with src/dst port=0)(when these packets are considered the flow count becomes as you said :24089)
 15. Pureflows (7359) when flows in a single flowset (Error :#3)[x]
+16. Can you provide pcaps with malicious flows for testing (consistency)
+17. MAX_PKT_COUNT while generating mal_flows
 
 # Check
 1. Check all TODOs
@@ -42,7 +44,7 @@
 7. Prevent random packets sent on interface
 8. Proper flow for returning errors.Check return values of bpf helpers and perform required action
 9. Remove timestamp from counter decode output
-10. Create a folder structure
+10. Create a folder structure[x]
 11. Add support for packets other than TCP and UDP[x]
 12. Remove unwanted memcpy to 128 bit before insertion
 13. Support for IPv6?
