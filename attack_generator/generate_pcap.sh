@@ -1,6 +1,6 @@
-#mkdir attack_generator/cia
-#mkdir attack_generator/qoa
-
+mkdir attack_generator/cia
+mkdir attack_generator/qoa
+:'
 echo "Generating attack flows for MalFlow Percent:0.03"
 python3 attack_generator/cia.py --pcap caida_trace/110k_24k_caida.pcap --percent_malflows 0.03 --output_file cia_0_03.pcap
 echo "Generating attack flows for MalFlow Percent:0.05"
@@ -19,7 +19,7 @@ echo "Generating attack flows for MalFlow Percent:5"
 python3 attack_generator/cia.py --pcap caida_trace/110k_24k_caida.pcap --percent_malflows 5 --output_file cia_5.pcap
 echo "Generating attack flows for MalFlow Percent:10"
 python3 attack_generator/cia.py --pcap caida_trace/110k_24k_caida.pcap --percent_malflows 10 --output_file cia_10.pcap
-
+'
 echo "Generating attack flows for MalFlow Percent:0.03"
 python3 attack_generator/qoa.py --pcap caida_trace/110k_24k_caida.pcap --percent_malflows 0.03 --output_file qoa_0_03.pcap
 echo "Generating attack flows for MalFlow Percent:0.05"

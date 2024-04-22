@@ -1,12 +1,7 @@
 import mmh3 #Murmur3 Hash function.
-from struct import unpack, pack, calcsize
 import bitarray
 import random
-import numpy as np
 import json
-from copy import deepcopy
-import pandas as pd
-import matplotlib.pyplot as plt
 from scapy.layers.l2 import Ether
 from scapy.all import *
 from argparse import ArgumentParser
@@ -21,6 +16,7 @@ GREx = 'GRE'
 ICMPx = 'ICMP'
 IPv4x = 'IPv4'
 RSVPx = 'RSVP'
+
 def count_unique_flows(filename):
     packets = PcapReader(filename=filename)
     flow_set = set()
@@ -34,9 +30,18 @@ def count_unique_flows(filename):
 
             if TCPx in pkt:
                 flow_set.add((pkt[IPx].src, pkt[IPx].dst, pkt[TCPx].sport, pkt[TCPx].dport, 6))
-            if UDPx in pkt:
+            elif UDPx in pkt:
                 flow_set.add((pkt[IPx].src, pkt[IPx].dst, pkt[UDPx].sport, pkt[UDPx].dport, 17))
-    
+            elif RSVPx in pkt:
+                flow_set.add((pkt[IPx].src, pkt[IPx].dst, 'RSVP'))
+            elif GREx in pkt:
+                flow_set.add((pkt[IPx].src, pkt[IPx].dst, 'GRE'))
+            elif ICMPx in pkt:
+                flow_set.add((pkt[IPx].src, pkt[IPx].dst, 'ICMP'))
+            elif ESPx in pkt:
+                flow_set.add((pkt[IPx].src, pkt[IPx].dst, 'ESP'))
+            else:
+                flow_set.add((pkt[IPx].src, pkt[IPx].dst, 'Prot'))
     print(f"Number of Unique_packets: {len(flow_set)}")
     return len(flow_set), list(source_ips), list(dest_ips)
 
@@ -46,7 +51,10 @@ except ImportError:
 	raise ImportError('pybloom requires bitarray >= 0.3.4')
 
 
-FLOW_FILTER_SIZE = 245000
+FLOW_FILTER_BITS_PER_SLICE = 32486
+FLOW_FILTER_SIZE = 227402
+NUM_HASH_FUNCS = 7
+
 def make_hashfuncs(num_slices, num_bits):
 
         seeds = [i for i in range(1,num_slices+1)]
@@ -189,12 +197,11 @@ def parse_args():
     return args
 
 if __name__ == '__main__':
-    
 
-    ff = flow_filter(FLOW_FILTER_SIZE, FLOW_FILTER_SIZE/7, 7)
+    ff = flow_filter(FLOW_FILTER_SIZE, FLOW_FILTER_BITS_PER_SLICE, NUM_HASH_FUNCS)
     args = parse_args()
     
-    file_meta_data = json.load(open('attack_generator/pcap_metadata.json'))
+    # file_meta_data = json.load(open('attack_generator/pcap_metadata.json'))
 
     file_name = args.pcap
     mal_flow_pct = args.percent_malflows
@@ -244,5 +251,4 @@ if __name__ == '__main__':
         timed_output.append(pkt)
 
     output_file.write(timed_output)
-
 

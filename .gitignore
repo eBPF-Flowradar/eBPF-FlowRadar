@@ -6,3 +6,10 @@ flowradar
 venv/
 results/
 univ_pt1/
+.pcap
+.zip
+qoa/
+cia/
+.VScodeCounter/
+attack_generator/cia
+attack_generator/qoa
