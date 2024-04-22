@@ -1,7 +1,6 @@
 import mmh3 #Murmur3 Hash function.
 import bitarray
 import random
-import json
 from scapy.layers.l2 import Ether
 from scapy.all import *
 from argparse import ArgumentParser
