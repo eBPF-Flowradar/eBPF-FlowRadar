@@ -5,10 +5,11 @@ set -e
 LOGS_PATH="/home/anonymous/eBPF-FlowRadar/sd_logs.csv"
 ANALYSIS_FILE="analysis_sd_pkl.txt"
 RES_DIR="results/$(date +"%Y-%m-%d:%H-%M-%S")_sd_pkl"
+PY_SCRIPT="analysis/analyse_sd_from_pkl.py"
 
 scp anonymous@192.168.122.246:$LOGS_PATH ./
 ssh anonymous@192.168.122.246 "rm $LOGS_PATH"
-python3 analyse_sd_from_pkl.py > $ANALYSIS_FILE
+python3 $PY_SCRIPT > $ANALYSIS_FILE
 cat $ANALYSIS_FILE
 
 # add extra info
