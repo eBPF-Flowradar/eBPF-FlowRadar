@@ -23,6 +23,7 @@
 
 #define SINGLE_DECODE_LOG_FILE "sd_logs.csv"
 #define COUNTER_DECODE_LOG_FILE "cd_logs.csv"
+#define DETECTION_LOG_FILE "detect.csv"
 
 
 struct pureset {
@@ -41,6 +42,8 @@ struct flowset {
   struct counting_table_entry counting_table[COUNTING_TABLE_SIZE];
   bool flow_filter[FLOW_FILTER_SIZE];
   int pkt_count;
+  int num_flows_collide_all_indices;  //for detection mechanism
+  int num_flows_all_new_cells;  //for detection mechanism
 };
 
 struct flowset_id_struct{

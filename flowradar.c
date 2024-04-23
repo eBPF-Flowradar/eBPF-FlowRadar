@@ -52,7 +52,6 @@ static void start_decode(int flowset_fd_0,int flowset_fd_1,int flowset_id_fd) {
     
 
     struct flowset flow_set;
-    double pktCount[COUNTING_TABLE_SIZE];  //double because to use in gsl
 
     //Get map currently in use
     struct flowset_id_struct current;
@@ -86,12 +85,18 @@ static void start_decode(int flowset_fd_0,int flowset_fd_1,int flowset_id_fd) {
       continue;
     }
 
-    
+    double pktCount[COUNTING_TABLE_SIZE];  //double because to use in gsl
+    int numHashCollisions=0;    //Data for detection mechanism
+
     // printf("FlowXOR ,FlowCount ,PacketCount\n");
     for(int i=0;i<COUNTING_TABLE_SIZE;i++){
 
       struct counting_table_entry cte=flow_set.counting_table[i];
       pktCount[i]=cte.packetCount;
+
+      if(cte.flowCount>1){
+        numHashCollisions+=cte.flowCount-1;
+      }
 
       // if(cte.flowXOR){
       
@@ -150,6 +155,21 @@ static void start_decode(int flowset_fd_0,int flowset_fd_1,int flowset_id_fd) {
     fclose(fptr);
     printf("Write complete\n");
 
+    
+    //Writing to detection log file
+    printf("\nWriting to Detection Log file\n");
+    fptr=fopen(DETECTION_LOG_FILE,"a");
+    if (fptr == NULL) {
+      perror("Error opening file");
+      return;  // or handle the error as needed
+    }
+    fprintf(fptr,"%d,%d,%d,%d\n",
+            num_purecells,
+            numHashCollisions,
+            flow_set.num_flows_collide_all_indices,
+            flow_set.num_flows_all_new_cells);
+    fclose(fptr);
+    printf("Write complete\n");
 
     
     //perform counter decode
@@ -224,6 +244,7 @@ int main(int argc, char *argv[]) {
   //remove log files if exist
   remove(SINGLE_DECODE_LOG_FILE);
   remove(COUNTER_DECODE_LOG_FILE);
+  remove(DETECTION_LOG_FILE);
 
   printf("\nStarting Decode\n");
   start_decode(Flowset_fd_0,Flowset_fd_1,Flowset_id_fd);

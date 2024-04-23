@@ -88,6 +88,8 @@ static __always_inline bool is_old_flow(__u128 flow_key,struct flowset *curr_flo
 static __always_inline int
 insert_flow_to_counting_table(__u128 flow_key, bool old_flow,struct flowset *curr_flowset) {
 
+  int num_collisions=0;   //for attack detection mechanism
+  int num_new=0;     //for attack detection mechanism
 
   for (int i = 0; i < COUNTING_TABLE_HASH_COUNT; ++i) {
 
@@ -107,6 +109,13 @@ insert_flow_to_counting_table(__u128 flow_key, bool old_flow,struct flowset *cur
     if(old_flow){
       cte.packetCount++;
     }else{
+
+      if(cte.flowXOR){
+        num_collisions++;
+      }else{
+        num_new++;
+      }
+
       cte.flowXOR ^= flow_key;
       cte.packetCount++;
       cte.flowCount++;
@@ -114,6 +123,14 @@ insert_flow_to_counting_table(__u128 flow_key, bool old_flow,struct flowset *cur
     
     curr_flowset->counting_table[hashIndex]=cte;
 
+  }
+
+  if(num_collisions==COUNTING_TABLE_HASH_COUNT){
+    curr_flowset->num_flows_collide_all_indices++;
+  }
+
+  if(num_new==COUNTING_TABLE_HASH_COUNT){
+    curr_flowset->num_flows_all_new_cells++;
   }
 
   return 0;
