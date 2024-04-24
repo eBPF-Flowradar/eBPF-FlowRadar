@@ -18,7 +18,7 @@
  
 #define PURE_SET_SIZE COUNTING_TABLE_SIZE    //TODO:need to check this
 
-#define POLL_TIME_MS  5000  //in milliseconds (280)
+#define POLL_TIME_MS  10000  //in milliseconds (280)
 #define POLL_TIME_US POLL_TIME_MS*1000   // in microseconds
 
 #define SINGLE_DECODE_LOG_FILE "sd_logs.csv"
