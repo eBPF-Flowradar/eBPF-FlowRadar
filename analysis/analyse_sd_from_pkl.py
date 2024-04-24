@@ -1,6 +1,7 @@
 from ipaddress import ip_address
 import struct
 import pickle
+import sys
 
 TCP="TCP"
 UDP="UDP"
@@ -38,6 +39,7 @@ def decode(flow_string:str):
 
 SD_FILE="sd_logs.csv"
 PKL_FILE="flows.pkl"
+DECODABLE_CSV_FILE="decodable.csv"
 
 sd_flows=set()
 
@@ -58,6 +60,8 @@ print(f"Actual Flow Count: {actual_flow_count}\n")
 
 if sd_flows==actual_flows:
     print("Equal, all flows are decoded successfully")
+    with open(DECODABLE_CSV_FILE,"a") as file:
+        file.write(f"0,100,{sys.argv[1]}\n")
 else:
     sd_actual=sd_flows-actual_flows
     actual_sd=actual_flows-sd_flows
@@ -79,3 +83,6 @@ else:
 
     print(f"\nDecodable flows :{dec_percent}%")
     print(f"Undecodable flows :{undec_percent}%")
+
+    with open(DECODABLE_CSV_FILE,"a") as file:
+        file.write(f"{undec_percent},{dec_percent},{sys.argv[1]}\n")

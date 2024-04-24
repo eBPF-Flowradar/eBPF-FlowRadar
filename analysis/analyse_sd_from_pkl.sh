@@ -13,7 +13,7 @@ scp anonymous@192.168.122.246:$LOGS_PATH/$SD_LOGS ./
 ssh anonymous@192.168.122.246 "rm $LOGS_PATH/$SD_LOGS"
 scp anonymous@192.168.122.246:$LOGS_PATH/$DETECT_LOGS ./
 ssh anonymous@192.168.122.246 "rm $LOGS_PATH/$DETECT_LOGS"
-python3 $PY_SCRIPT > $ANALYSIS_FILE
+python3 $PY_SCRIPT $* > $ANALYSIS_FILE
 cat $ANALYSIS_FILE
 
 # add extra info
