@@ -20,7 +20,7 @@ set -e
 
 find "$PARENT_FOLDER" -maxdepth 1 -mindepth 1 -type d -print0 |
 while IFS= read -r -d '' PCAP_FOLDER; do
-    echo "Processing folder: $folder"
+    echo "Processing folder: $PCAP_FOLDER"
 
     # Loop through each file in the folder
     for file in "$PCAP_FOLDER"/*; do
