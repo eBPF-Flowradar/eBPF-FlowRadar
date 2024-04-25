@@ -60,7 +60,8 @@
 3.`sudo cat /sys/kernel/tracing/trace_pipe` : bpf tracepipe (bpf_printk() for printing)
 4.`sudo ip link set dev <interface> up` : setting the interface up
 5.`tcprewrite --dlt=enet --enet-dmac=00:11:22:33:44:55 --enet-smac=66:77:88:99:AA:BB --infile=input.pcap --outfile=output.pcap`[Adding fake ethernet headers (but not working)](https://edeca.net/post/2011-06-20-adding-fake-ethernet-headers-to-pcap-files/)
-6`.sudo tcpreplay -i veth1 output_with_eth.pcap`  [refer](https://tcpreplay.appneta.com/wiki/tcpreplay)
+6.`sudo tcpreplay -i veth1 output_with_eth.pcap`  [refer](https://tcpreplay.appneta.com/wiki/tcpreplay)
+7. `sudo pkill -f flowradar` :Kill flowradar process
 
 # Notes
 1. The 110k_24k_caida.pcap has raw ip packets without the ethernet header, this causes issues with our program as it expects ethernet headers, currently while testing with scapy we are adding the ethernet headers and sending to the interface.
