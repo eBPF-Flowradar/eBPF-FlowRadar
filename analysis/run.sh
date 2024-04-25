@@ -9,9 +9,11 @@ DECODABLE_CSV_FILE="decodable.csv"
 PARENT_FOLDER="/home/anonymousa/Projects/eBPF-FlowRadar/analysis/pcap_files"
 FINAL_RESULTS_FOLDER="/home/anonymousa/Projects/eBPF-FlowRadar/final_results"
 RESULTS_FOLDER="/home/anonymousa/Projects/eBPF-FlowRadar/results"
+TEMP_FOLDER="/home/anonymousa/Projects/eBPF-FlowRadar/temp/"
 
 #delete before analysis
 sudo rm $DECODABLE_CSV_FILE
+mv $RESULTS_FOLDER/*  $TEMP_FOLDER
 
 #exit on error
 set -e
