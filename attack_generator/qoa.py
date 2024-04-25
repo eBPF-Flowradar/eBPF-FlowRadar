@@ -15,7 +15,7 @@ GREx = 'GRE'
 ICMPx = 'ICMP'
 IPv4x = 'IPv4'
 RSVPx = 'RSVP'
-
+     
 def count_unique_flows(filename):
     packets = PcapReader(filename=filename)
     flow_set = set()
@@ -91,6 +91,17 @@ class flow_filter:
     
         return True
     
+    
+    def all_bit_set(self, key):
+        make_hashes  = make_hashfuncs(num_slices=self.num_slices, num_bits=self.bits_per_slice)
+        hashes = make_hashes(key)
+        print(hashes)
+        hashes = [int(hashes[i] + self.bits_per_slice * i) for i in range(self.num_slices)]
+        print(hashes)
+        for h in hashes:
+            if self.ff[h] is False:
+                return False
+        return True
 
     def insert_into_flow_filter(self,key):
         make_hashes  = make_hashfuncs(num_slices=self.num_slices, num_bits=self.bits_per_slice)
@@ -153,6 +164,36 @@ def convert_to_hex(data):
 
 	return flow_details
 
+def get_flow_counts(file_name):
+    packets = PcapReader(filename=file_name)
+    flow_freq_map = {}
+    for pkt in packets:
+        if IP in pkt:
+            src_ip = str(pkt[IP].src)
+            dst_ip = str(pkt[IP].dst)
+            proto = None
+            sport = None
+            dport = None
+            if TCPx in pkt:
+                sport = int(pkt[TCPx].sport)
+                dport = int(pkt[TCPx].dport)
+                proto = 6
+            elif UDPx in pkt:
+                sport = int(pkt[UDPx].sport)
+                dport = int(pkt[UDPx].dport)
+                proto = 17
+            else:
+                sport = 0
+                dport = 0
+                proto = 0
+            flow_key = list(convert_to_hex([src_ip, dst_ip, sport, dport, proto]).keys())[0]
+            if flow_key not in flow_freq_map.keys():
+                flow_freq_map[flow_key] = 1
+            else:
+                flow_freq_map[flow_key] += 1
+    return list(flow_freq_map.values())
+    
+
 
 def generate_malicious_flows(input_file: str, mal_flow_count: int, flow_filter:flow_filter, source_ips: list, dest_ips: list):
     protocols = [6, 17]
@@ -182,8 +223,14 @@ def generate_malicious_flows(input_file: str, mal_flow_count: int, flow_filter:f
         flow = [ran_ip_src, ran_ip_dst, ran_port_src, ran_port_dst, proto]
         print(f"Generated Flow {flow}")
         key = list(convert_to_hex(flow).keys())[0]
-        polluting_items.append(key)
-        item_pool.append(flow)
+
+        if flow_filter.all_bit_set(key) is True:
+            if key not in polluting_items:
+                item_pool.append(flow)
+                print(flow)
+                polluting_items.append(key)
+                print(key)
+                flow_filter.insert_into_flow_filter(key)
     return item_pool
 
 
@@ -212,14 +259,22 @@ if __name__ == '__main__':
     packets = PcapReader(filename=file_name)
     output = []
     timestamp = time.time()
-
+    flow_counts = get_flow_counts('caida_trace/110k_24k_caida.pcap')
+    flow_counts = sorted(flow_counts)
+    tidx = int(len(flow_counts)/3)
     for flow in output_flows:
-        print(flow)
         
         ip_packet = IP(src=flow[0], dst= flow[1])          
+        
         packet = None
-        num_packets = random.randint(1,60)
-  
+        bkt = random.randint(0, 2)
+        if bkt == 0:
+            num_packets = random.choice(flow_counts[0:tidx])
+        elif bkt == 1:
+            num_packets = random.choice(flow_counts[tidx:2*tidx])
+        elif bkt == 2:
+            num_packets = random.choice(flow_counts[2*tidx:])
+
         for i in range(num_packets):
             
             if int(flow[4]) == 6:
@@ -246,7 +301,7 @@ if __name__ == '__main__':
     timed_output = []
     for pkt in output:
         pkt.time = timestamp;
-        timestamp += random.randint(1,40)/1000000
+        timestamp += random.randint(1,5)/1000000
         timed_output.append(pkt)
 
     output_file.write(timed_output)
