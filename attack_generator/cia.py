@@ -222,6 +222,26 @@ def generate_malicious_flows(input_file: str, mal_flow_count: int, flow_filter:f
                 flow_filter.insert_into_flow_filter(key)
     return item_pool
 
+def generate_packet_map(input_flows: list, flow_counts: list):
+    flow_counts.sort(reverse=True)
+    flow_freq_map = dict()
+    idx = int(len(flow_counts)/3)
+    i = 0
+    generated_flow_counts = []
+    while i < len(flow_counts):
+        generated_flow_counts.append(random.choice(flow_counts[0:idx]))
+        generated_flow_counts.append(random.choice(flow_counts[idx:2*idx]))
+        generated_flow_counts.append(random.choice(flow_counts[2*idx:]))
+        i = i + 3
+    pkt = 0
+    packet_len = len(flow_counts)
+
+    for flow in input_flows:
+        flow_key = list(convert_to_hex(flow).keys())[0]
+        flow_freq_map[flow_key] = generated_flow_counts[pkt]
+        pkt = (pkt+1)% packet_len
+
+    return flow_freq_map
 
 def parse_args():
     parser = ArgumentParser()
@@ -246,26 +266,19 @@ if __name__ == '__main__':
     packets = PcapReader(filename=file_name)
     output = []
     timestamp = time.time()
-
+    
     flow_counts = get_flow_counts('caida_trace/110k_24k_caida.pcap')
-    print(flow_counts)
-    flow_counts = sorted(flow_counts)
-    tidx = int(len(flow_counts)/3)
+    packet_freq_map = generate_packet_map(output_flows, flow_counts)
 
     for flow in output_flows:
-        print(flow)    
+        
+        packet = None
         ip_packet = IP(src=flow[0], dst= flow[1])          
-        packet = None
+        
+        flow_key = list(convert_to_hex(flow).keys())[0]
 
-        packet = None
-        bkt = random.randint(0, 2)
-        if bkt == 0:
-            num_packets = random.choice(flow_counts[0:tidx])
-        elif bkt == 1:
-            num_packets = random.choice(flow_counts[tidx:2*tidx])
-        elif bkt == 2:
-            num_packets = random.choice(flow_counts[2*tidx:])
-
+        num_packets = packet_freq_map[flow_key]
+        
         for i in range(num_packets):
             
             if flow[4] == 6:

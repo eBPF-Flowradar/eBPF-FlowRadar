@@ -38,7 +38,6 @@ def process_pcap(input_file, output_file):
 # Specify the input and output PCAP file names
 input_pcap = "110k_24k_caida.pcap"
 output_pcap = "output_with_eth.pcap"
-
 # Process the PCAP file
 process_pcap(input_pcap, output_pcap)
 print("Done")
