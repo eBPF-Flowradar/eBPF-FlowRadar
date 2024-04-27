@@ -4,18 +4,19 @@
 3. Doubt in Counter decode in figure paper.
 4. XDP can only capture packets from RX (incoming side). Is that a problem ?
 5. Is there an issue with adding the ethernet headers ? [x]
-6. Ask about hashes are implemented for consistent implementation with theirs
-7. Extra metadata to be stored?  (e.g., packet counters, and the flow starting and finish times).
+6. Ask about hashes are implemented for consistent implementation with theirs[x]
+7. Extra metadata to be stored?  (e.g., packet counters, and the flow starting and finish times).[x]
 8. When should we clear the flowset? In the simulation its done in sequential order. [x]
 9. Should there be IPv6 support?
 10. Added ethernet headers to packets using scapy, certain metadata is missing from the packet (flow id and time is maintatined)
 11. How are you guys doing counter decode? In P4 or simulating in python
 12. Sleeping for 280ms is implemented through usleep. Wont be accurate. Is that enough?
-13. Currently packets gets inserted into 2 or 3 flowsets. Should all packets be inserted into the same flowset?
-14. How are you guys dealing with fragmented IP packets? (packet 34 in pcap UDP with src/dst port=0)(when these packets are considered the flow count becomes as you said :24089)
+13. Currently packets gets inserted into 2 or 3 flowsets. Should all packets be inserted into the same flowset?[x]
+14. How are you guys dealing with fragmented IP packets? (packet 34 in pcap UDP with src/dst port=0)(when these packets are considered the flow count becomes as you said :24089)[x]
 15. Pureflows (7359) when flows in a single flowset (Error :#3)[x]
 16. Can you provide pcaps with malicious flows for testing (consistency)
-17. MAX_PKT_COUNT while generating mal_flows
+17. MAX_PKT_COUNT while generating mal_flows[x]
+18. Tell about our testing results, ask for pcap files for consistent results
 
 # Check
 1. Check all TODOs
@@ -48,6 +49,7 @@
 11. Add support for packets other than TCP and UDP[x]
 12. Remove unwanted memcpy to 128 bit before insertion
 13. Support for IPv6?
+14. Make a circular queue structure for flowset 
 
 # Errors
 1. Errors due to empty flowsets being passed down to gsl [x]
