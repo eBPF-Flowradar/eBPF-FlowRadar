@@ -1,0 +1,9 @@
+*.o
+*.csv
+.vscode/
+flowradar
+*.pcap
+*.pkl
+venv/
+results/
+*.txt
