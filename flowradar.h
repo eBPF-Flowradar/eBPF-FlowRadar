@@ -18,8 +18,12 @@
  
 #define PURE_SET_SIZE COUNTING_TABLE_SIZE    //TODO:need to check this
 
-#define POLL_TIME_MS  10000  //in milliseconds (280)
+#define POLL_TIME_MS  280  //in milliseconds (280)
 #define POLL_TIME_US POLL_TIME_MS*1000   // in microseconds
+
+
+#define RING_BUFFER_SIZE 100
+
 
 #define SINGLE_DECODE_LOG_FILE "sd_logs.csv"
 #define COUNTER_DECODE_LOG_FILE "cd_logs.csv"
@@ -58,5 +62,19 @@ struct network_flow {
   __u16 dest_port;
   __u8 protocol;
 };
+
+struct ring_buffer{
+  struct flowset * const buffer;
+  int head;
+  int tail;
+  const int maxlen;
+};
+
+struct thread_args{
+  int flowset_fd_0;
+  int flowset_fd_1;
+  int flowset_id_fd;
+};
+
 
 #endif // !FLOW_RADAR_H

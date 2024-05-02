@@ -49,7 +49,7 @@
 11. Add support for packets other than TCP and UDP[x]
 12. Remove unwanted memcpy to 128 bit before insertion
 13. Support for IPv6?
-14. Make a circular queue structure for flowset 
+14. Make a circular queue structure for flowset [x][resource](https://embedjournal.com/implementing-circular-buffer-embedded-c/)
 
 # Errors
 1. Errors due to empty flowsets being passed down to gsl [x]
