@@ -58,5 +58,6 @@ except OSError:
 
 
 # Replace 'eth0' with the interface you want to listen on
-sniff(iface='veth2', prn=packet_callback, store=0)
+# sniff(iface='veth2', prn=packet_callback, store=0)
+sniff(iface='br0', prn=packet_callback, store=0)
 

@@ -50,7 +50,7 @@
 12. Remove unwanted memcpy to 128 bit before insertion
 13. Support for IPv6?
 14. Make a circular queue structure for flowset [x][resource](https://embedjournal.com/implementing-circular-buffer-embedded-c/)
-15. Remove veth (uneccasary)
+15. Remove veth (uneccasary)[x]
 
 # Errors
 1. Errors due to empty flowsets being passed down to gsl [x]
