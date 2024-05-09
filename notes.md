@@ -10,13 +10,13 @@
 9. Should there be IPv6 support?
 10. Added ethernet headers to packets using scapy, certain metadata is missing from the packet (flow id and time is maintatined)
 11. How are you guys doing counter decode? In P4 or simulating in python
-12. Sleeping for 280ms is implemented through usleep. Wont be accurate. Is that enough?
+12. Sleeping for 280ms is implemented through usleep. Wont be accurate. Is that enough?[x] (now collection done in seperate thread)
 13. Currently packets gets inserted into 2 or 3 flowsets. Should all packets be inserted into the same flowset?[x]
 14. How are you guys dealing with fragmented IP packets? (packet 34 in pcap UDP with src/dst port=0)(when these packets are considered the flow count becomes as you said :24089)[x]
 15. Pureflows (7359) when flows in a single flowset (Error :#3)[x]
 16. Can you provide pcaps with malicious flows for testing (consistency)
 17. MAX_PKT_COUNT while generating mal_flows[x]
-18. Tell about our testing results, ask for pcap files for consistent results
+
 
 # Check
 1. Check all TODOs

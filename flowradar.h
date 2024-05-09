@@ -23,6 +23,7 @@
 
 
 #define RING_BUFFER_SIZE 100
+#define RING_BUFFER_FULL_WAIT_TIME  5  //in seconds
 
 
 #define SINGLE_DECODE_LOG_FILE "sd_logs.csv"

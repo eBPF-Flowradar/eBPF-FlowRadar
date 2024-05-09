@@ -100,11 +100,12 @@ void *flowset_switcher_thread(void *arg){
       continue;
     }
 
-    //add the flowset to ring buffer, if full exit
-    if(ring_buf_push(&flowset_ring_buffer,flow_set)){
-      printf("Ring buffer full\n");
-      // pthread_exit(NULL);
-      int_exit(1);
+    //add the flowset to ring buffer, if full wait till free space
+    while(ring_buf_push(&flowset_ring_buffer,flow_set)){
+      printf("--------------------------------------------------------------\n");
+      printf("Flow Switcher Error : Ring buffer full. Waiting for %d seconds\n",RING_BUFFER_FULL_WAIT_TIME);
+      printf("--------------------------------------------------------------\n");
+      sleep(RING_BUFFER_FULL_WAIT_TIME);
     }
 
     //reset the flowset 
