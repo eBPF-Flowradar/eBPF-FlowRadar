@@ -100,6 +100,11 @@ void *flowset_switcher_thread(void *arg){
       continue;
     }
 
+
+    //reset the flowset 
+    printf("Reset the flowset in kernel space\n");
+    initialize_flowset(curr_flowset_fd);
+
     //add the flowset to ring buffer, if full wait till free space
     while(ring_buf_push(&flowset_ring_buffer,flow_set)){
       printf("--------------------------------------------------------------\n");
@@ -107,11 +112,6 @@ void *flowset_switcher_thread(void *arg){
       printf("--------------------------------------------------------------\n");
       sleep(RING_BUFFER_FULL_WAIT_TIME);
     }
-
-    //reset the flowset 
-    printf("Reset the flowset in kernel space\n");
-    initialize_flowset(curr_flowset_fd);
-
 
   }
 }
