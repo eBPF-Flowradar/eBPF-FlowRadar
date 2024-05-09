@@ -164,7 +164,9 @@ static void start_decode() {
       printf("\nStarting single decode\n");
       while(check_purecells(&flow_set)){
 
-        single_decode(&flow_set,&pure_set);
+        if(single_decode(&flow_set,&pure_set)){
+          return;
+        }
 
       }
 
@@ -216,7 +218,9 @@ static void start_decode() {
       
       //perform counter decode
       printf("\nStarting Counter Decode\n");
-      counter_decode(&pure_set,pktCount);
+      if(counter_decode(&pure_set,pktCount)){
+        return;
+      }
         
     }
 

@@ -1,16 +1,17 @@
 #include "flowradar.h"
 
-void add(struct pureset *pure_set, __u128 flowXOR) {
+static int add(struct pureset *pure_set, __u128 flowXOR) {
 
   //each element of pure set is unique no check required(verify)
   if(pure_set->latest_index>=PURE_SET_SIZE){
-    printf("pure_set Index (%d) exceeds PURE_SET_SIZE(%d)\n",pure_set->latest_index,PURE_SET_SIZE);
-    exit(1);   //handle errors here (including removing the xdp program)
+    fprintf(stderr,"Error : pure_set out of bounds access\n");
+    return -1;   //handle errors here (including removing the xdp program)
   }
 
 
   pure_set->purecells[pure_set->latest_index] = flowXOR;
   pure_set->latest_index = pure_set->latest_index + 1;
+  return 0;
 }
 
 
@@ -32,7 +33,7 @@ int check_purecells(struct flowset* A){
 
 
 
-void single_decode(struct flowset* A,struct pureset* pure_set) {
+int single_decode(struct flowset* A,struct pureset* pure_set) {
 
 
   for (int c = 0; c < COUNTING_TABLE_SIZE; ++c) {
@@ -42,8 +43,12 @@ void single_decode(struct flowset* A,struct pureset* pure_set) {
 
     if (ct_entry.flowCount == 1) {
       __u128 flowXOR = ct_entry.flowXOR;
-      //add to pureset
-      add(pure_set, flowXOR);
+
+      //add to pureset and if it overflows return -1
+      if(add(pure_set, flowXOR)){
+        return -1;
+      }
+
       int packetCount = ct_entry.packetCount;
 
       for (int num_hash = 0; num_hash < COUNTING_TABLE_HASH_COUNT; ++num_hash) {
@@ -61,5 +66,5 @@ void single_decode(struct flowset* A,struct pureset* pure_set) {
       }
     }
   }
-
+  return 0;
 }
