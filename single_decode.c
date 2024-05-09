@@ -15,28 +15,28 @@ static int add(struct pureset *pure_set, __u128 flowXOR) {
 }
 
 
-//TODO:more efficient possible,return the  index to prevent the first search in single decode
+//finds the first index of a pure cell, if no pure cell return -1
 int check_purecells(struct flowset* A){
     
   for(int i=0;i<COUNTING_TABLE_SIZE;i++){
 
     if(A->counting_table[i].flowCount==1){
-      return 1;
+      return i;
     }
 
 
   }
 
-  return 0;
+  return -1;
 
 }
 
 
 
-int single_decode(struct flowset* A,struct pureset* pure_set) {
+int single_decode(struct flowset* A,struct pureset* pure_set,int init_index) {
 
 
-  for (int c = 0; c < COUNTING_TABLE_SIZE; ++c) {
+  for (int c = init_index; c < COUNTING_TABLE_SIZE; ++c) {
 
     struct counting_table_entry ct_entry = A->counting_table[c];
     
