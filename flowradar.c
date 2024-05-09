@@ -28,6 +28,7 @@ struct ring_buffer flowset_ring_buffer ={
   .buffer=buffer,
   .head=0,
   .tail=0,
+  .count=0,
   .maxlen=RING_BUFFER_SIZE
 };
 
@@ -112,6 +113,7 @@ void *flowset_switcher_thread(void *arg){
       printf("--------------------------------------------------------------\n");
       sleep(RING_BUFFER_FULL_WAIT_TIME);
     }
+    printf("Number of elements in the ring buffer: %d\n",flowset_ring_buffer.count);
 
   }
 }
@@ -128,6 +130,7 @@ static void start_decode() {
 
     if(!ring_buf_pop(&flowset_ring_buffer,&flow_set)){
 
+      printf("Number of elements in the ring buffer: %d\n",flowset_ring_buffer.count);
 
       double pktCount[COUNTING_TABLE_SIZE];  //double because to use in gsl
       int numHashCollisions=0;    //Data for detection mechanism

@@ -13,6 +13,7 @@ int ring_buf_push(struct ring_buffer *c, struct flowset data)
 
     c->buffer[c->head] = data;  // Load data and then move
     c->head = next;             // head to next data offset.
+    c->count++;
     return 0;  // return success to indicate successful push.
 }
 
@@ -30,5 +31,6 @@ int ring_buf_pop(struct ring_buffer *c, struct flowset *data)
 
     *data = c->buffer[c->tail];  // Read data and then move
     c->tail = next;              // tail to next offset.
+    c->count--;
     return 0;  // return success to indicate successful pop.
 }

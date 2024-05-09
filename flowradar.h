@@ -68,6 +68,7 @@ struct ring_buffer{
   struct flowset * const buffer;
   int head;
   int tail;
+  int count;
   const int maxlen;
 };
 
