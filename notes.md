@@ -37,7 +37,7 @@
 1. Pureset need not be a set as the flows added will be unique always [x]
 2. Change implementation of single decode to perform it until no pure cells exist [x]
 3. delay before start_decode function [x]
-4. Unload the XDP program on error
+4. Unload the XDP program on error[x]
 5. Continue the loop if counting table empty in start_decode [x]
 6. Replace the bpf maps with support for locks[x]
     - [lwn article on BPF spinlocks](https://lwn.net/Articles/779120/)
