@@ -109,7 +109,7 @@ void *flowset_switcher_thread(void *arg){
     //add the flowset to ring buffer, if full wait till free space
     while(ring_buf_push(&flowset_ring_buffer,flow_set)){
       printf("--------------------------------------------------------------\n");
-      printf("Flow Switcher Error : Ring buffer full. Waiting for %d seconds\n",RING_BUFFER_FULL_WAIT_TIME);
+      printf("Flow Switcher: Ring buffer full. Waiting for %d seconds\n",RING_BUFFER_FULL_WAIT_TIME);
       printf("--------------------------------------------------------------\n");
       sleep(RING_BUFFER_FULL_WAIT_TIME);
     }
@@ -176,7 +176,7 @@ static void start_decode() {
       fptr=fopen(SINGLE_DECODE_LOG_FILE,"a");
 
       if (fptr == NULL) {
-        perror("Error opening file");
+        perror("Failed to open SINGLE_DECODE_LOG_FILE");
         return;  // or handle the error as needed
       }
 
@@ -202,7 +202,7 @@ static void start_decode() {
       printf("\nWriting to Detection Log file\n");
       fptr=fopen(DETECTION_LOG_FILE,"a");
       if (fptr == NULL) {
-        perror("Error opening file");
+        perror("Failed to open DETECTION_LOG_FILE");
         return;  // or handle the error as needed
       }
       fprintf(fptr,"%d,%d,%d,%d\n",
@@ -233,7 +233,7 @@ int main(int argc, char *argv[]) {
 
   // IS THIS NECESSARY
   if (setrlimit(RLIMIT_MEMLOCK, &r)) {
-    fprintf(stderr, "ERROR:failed to set rlimit\n");
+    perror("Failed to set rlimit");
     return 1;
   }
 
@@ -248,21 +248,21 @@ int main(int argc, char *argv[]) {
 
   ifindex = if_nametoindex(argv[1]);
   if (!ifindex) {
-    printf("Getting ifindex from interface name failed\n");
+    perror("Failed to get ifindex from interface name");
     return 1;
   }
 
   /* load XDP object by libxdp */
   prog = xdp_program__open_file("flowradar.o", "xdp", NULL);
   if (!prog) {
-    printf("Error, load xdp prog failed\n");
+    perror("Failed to load XDP Program");
     return 1;
   }
 
   // MAYBE CHANGE to XDP_MODE_NATIVE
   ret = xdp_program__attach(prog, ifindex, XDP_MODE_SKB, 0);
   if (ret) {
-    printf("Error, Set xdp fd on %d failed\n", ifindex);
+    perror("Failed to attach XDP Program");
     return ret;
   }
 

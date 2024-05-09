@@ -30,7 +30,7 @@ int counter_decode(struct pureset *pure_set, double *pktCount) {
 
 
   if (!A || !x || !B || !cov || !work) {
-    fprintf(stderr, "Memory allocation failed\n");
+    perror("Failed to allocate memory");
     return -1;
   }
 
@@ -68,7 +68,7 @@ int counter_decode(struct pureset *pure_set, double *pktCount) {
   fptr=fopen(COUNTER_DECODE_LOG_FILE,"a");
 
   if (fptr == NULL) {
-    perror("Error opening file");
+    perror("Failed to open COUNTER_DECODE_LOG_FILE");
     return -1;  // or handle the error as needed
   }
 
