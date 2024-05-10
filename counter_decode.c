@@ -84,7 +84,9 @@ int counter_decode(struct pureset *pure_set, double *pktCount) {
     fprintf(fptr,"%" PRIx64 "%016" PRIx64",",
              (uint64_t)(pure_set->purecells[i] >> 64),
              (uint64_t)pure_set->purecells[i]);
-    fprintf(fptr,"%d\n",(int)round(gsl_vector_get(x,i)));  //rounding off to nearest integer
+    int cnt=(int)round(gsl_vector_get(x,i));
+    cnt=cnt>0?cnt:1;
+    fprintf(fptr,"%d\n",cnt);  //rounding off to nearest integer
   }
 
   fclose(fptr);
