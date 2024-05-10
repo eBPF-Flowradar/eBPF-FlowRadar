@@ -93,19 +93,50 @@ if cd_flows==sniff_flows:
 else:
     differences=dict_differences(cd_flows,sniff_flows)
 
-    print(CD_FLOWS_KEY)
+    # print(CD_FLOWS_KEY)
+    cd_sniff=len(differences[CD_FLOWS_KEY])
+    print(f"Number of flows in Counter Decode but not in Sniffed flows: {cd_sniff} (zero expected)")
+
     for flow in differences[CD_FLOWS_KEY]: 
         print(f"{flow} {decode(flow)}")
     print()
 
-    print(SNF_FLOWS_KEY)
+    # print(SNF_FLOWS_KEY)
+    undec_num=len(differences[SNF_FLOWS_KEY])
+    print(f"Number of undecodable flows: {undec_num}")
     for flow in differences[SNF_FLOWS_KEY]: 
         print(f"{flow} {decode(flow)}")
     print()
 
-    print(DIFF_VALUES)
+    # print(DIFF_VALUES)
+    incorrect_num=len(differences[DIFF_VALUES])
+    print(f"Number of incorrectly decoded flows: {incorrect_num}")
     for flow in differences[DIFF_VALUES]:
         print(f"{flow} {decode(flow)}")
         print(f"cd_flows:{differences[DIFF_VALUES][flow][0]}")
         print(f"sniff_flows:{differences[DIFF_VALUES][flow][1]}")
         print()
+    
+    sniff_flow_count=len(sniff_flows)
+    cd_flow_count=len(cd_flows)
+
+    undec_percent=(undec_num/sniff_flow_count)*100
+    
+    dec_num=cd_flow_count-cd_sniff
+    dec_percent=(dec_num/sniff_flow_count)*100
+
+    incorrect_percent=(incorrect_num/sniff_flow_count)*100
+
+    print("Summary")
+
+    print(f"Total Number of flows: {sniff_flow_count}")
+    print(f"Number of decodable flows: {dec_num}")
+    print(f"Number of undecodable flows: {undec_num}")
+    print(f"Number of incorrectly decodable flows: {incorrect_num}")
+
+
+
+    print(f"Percentage of decodable flows: {dec_percent}%")
+    print(f"Percentage of undecodable flows: {undec_percent}%")
+    print(f"Percentage of incorrectly decoded flows: {incorrect_percent}%")
+
