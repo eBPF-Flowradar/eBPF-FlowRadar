@@ -136,7 +136,7 @@ else:
 
 
 
-    print(f"Percentage of decodable flows: {dec_percent}%")
-    print(f"Percentage of undecodable flows: {undec_percent}%")
-    print(f"Percentage of incorrectly decoded flows: {incorrect_percent}%")
+    print(f"Percentage of decodable flows: {dec_percent} %")
+    print(f"Percentage of undecodable flows: {undec_percent} %")
+    print(f"Percentage of incorrectly decoded flows: {incorrect_percent} %")
 
