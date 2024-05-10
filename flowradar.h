@@ -6,15 +6,24 @@
 #include <stdbool.h>
 #include <linux/bpf.h>   //don't know whether its good to include it here
 
-#define FLOW_FILTER_HASH_COUNT 7
-#define COUNTING_TABLE_HASH_COUNT 4
+#define FLOW_FILTER_HASH_COUNT 7  //int(math.ceil(math.log(1 / FPR, 2)))  #here FPR is false positive rate (0.01)
+#define COUNTING_TABLE_HASH_COUNT 4  //already fixed
 
-// #define FLOW_FILTER_BITS_PER_SLICE 35000
-#define FLOW_FILTER_BITS_PER_SLICE 32985  
-#define COUNTING_TABLE_ENTRIES_PER_SLICE 7801
 
-#define FLOW_FILTER_SIZE  FLOW_FILTER_HASH_COUNT * FLOW_FILTER_BITS_PER_SLICE  //230895  
-#define COUNTING_TABLE_SIZE  COUNTING_TABLE_HASH_COUNT * COUNTING_TABLE_ENTRIES_PER_SLICE //31204
+/*
+	ck[3] = 1.222
+	ck[4] = 1.295
+	ck[5] = 1.425
+	ck[6] = 1.570
+	ck[7] = 1.721
+*/
+
+
+#define FLOW_FILTER_BITS_PER_SLICE 33000   //int(math.ceil((EXP_NO_OF_FLOWS * abs(math.log(FPR))) /(FLOW_FILTER_HASH_COUNT * (math.log(2) ** 2))))  #EXP_NO_OF_FLOWS=24100
+#define COUNTING_TABLE_ENTRIES_PER_SLICE 7804 //int(math.floor((int(EXP_NO_OF_FLOWS * ck[COUNTING_TABLE_HASH_COUNT]) + 10) / COUNTING_TABLE_HASH_COUNT)) 
+
+#define FLOW_FILTER_SIZE  FLOW_FILTER_HASH_COUNT * FLOW_FILTER_BITS_PER_SLICE  //231000  
+#define COUNTING_TABLE_SIZE  COUNTING_TABLE_HASH_COUNT * COUNTING_TABLE_ENTRIES_PER_SLICE //31216
  
 #define PURE_SET_SIZE COUNTING_TABLE_SIZE    //TODO:need to check this
 
