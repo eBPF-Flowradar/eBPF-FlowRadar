@@ -141,8 +141,14 @@ static void start_decode() {
         struct counting_table_entry cte=flow_set.counting_table[i];
         pktCount[i]=cte.packetCount;
 
-        if(cte.flowCount>1){
-          numHashCollisions+=cte.flowCount-1;
+        //only new flows
+        // if(cte.flowCount>1){
+        //   numHashCollisions+=cte.flowCount-1;
+        // }
+
+        //all flows
+        if(cte.packetCount>1){
+          numHashCollisions+=cte.packetCount-1;
         }
 
         // if(cte.flowXOR){
