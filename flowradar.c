@@ -36,9 +36,13 @@ struct ring_buffer flowset_ring_buffer ={
 //relying on automatic init by compiler
 struct flowset empty_flowset;
 
+struct flowset_id_struct flowset_wait={
+  .id=wait_enum
+};
+
 
 static void int_exit(int sig) {
-  pthread_cancel(thread_id);
+  // pthread_cancel(thread_id);
   xdp_program__detach(prog, ifindex, XDP_MODE_SKB, 0);
   xdp_program__close(prog);
   exit(sig);
@@ -64,7 +68,113 @@ void *flowset_switcher_thread(void *arg){
 
   while(true){
 
-    usleep(POLL_TIME_US);
+    // usleep(POLL_TIME_US);
+
+
+    for(int i=0;i<DETECTION_WINDOWS_PER_EPOCH;i++){
+      usleep(DETECTION_TIME_WINDOW_US);
+
+
+      printf("Detection time window: %d\n",i+1);
+
+      struct flowset flow_set;
+
+      //Get map currently in use
+      struct flowset_id_struct current;
+      int curr_flowset_fd;
+      bpf_map_lookup_elem(flowset_id_fd, &first, &current);
+
+      if(current.id==flowset_enum_1){
+        curr_flowset_fd=flowset_fd_1;
+        printf("Flowset 1 in use\n");
+      }else if(current.id==flowset_enum_0){
+        curr_flowset_fd=flowset_fd_0;
+        printf("Flowset 0 in use\n");
+      }else{
+        fprintf(stderr,"Invalid flowset_fd\n");
+        int_exit(1);
+      }
+
+      //update the flowset_id to wait state
+      //TODO: find a better way of doing this
+      bpf_map_update_elem(flowset_id_fd, &first, &flowset_wait, BPF_F_LOCK);
+
+      printf("Getting the flowset from kernel space\n");
+      bpf_map_lookup_elem(curr_flowset_fd,&first,&flow_set);
+
+      if(flow_set.pkt_count==0){
+        printf("Flowset empty!!!\n");
+        //update the flowset_id to previous state
+        bpf_map_update_elem(flowset_id_fd, &first, &current, BPF_F_LOCK);
+        continue;
+      }
+
+      int numHashCollisions=0;
+      
+      for(int i=0;i<COUNTING_TABLE_SIZE;i++){
+
+        struct counting_table_entry cte=flow_set.counting_table[i];
+
+
+        //only new flows
+        // if(cte.flowCount>1){
+        //   numHashCollisions+=cte.flowCount-1;
+        // }
+
+        //all flows
+        if(cte.packetCount>1){
+          numHashCollisions+=cte.packetCount-1;
+        }
+
+        // if(cte.flowXOR){
+        
+          // printf("%" PRIx64 "%016" PRIx64, (uint64_t)(cte.flowXOR >> 64),
+          //       (uint64_t)cte.flowXOR);
+          // printf(" ,%d ,%d\n", cte.flowCount, cte.packetCount);
+        // }
+
+      }
+
+      //perform single decode and print the purecells
+      struct pureset pure_set;
+      pure_set.latest_index=0;
+      //perform single decode till there are no pure cells left
+      printf("\nStarting single decode\n");
+      int init_index=0;  //index of the first purecell
+      while((init_index=check_purecells(&flow_set))!=-1){
+
+        if(single_decode(&flow_set,&pure_set,init_index)){
+          // return;
+          int_exit(1);
+        }
+
+      }
+
+      int num_purecells=pure_set.latest_index;
+
+      //Writing to detection log file
+      printf("\nWriting to Detection Log file\n");
+      FILE *fptr;
+      fptr=fopen(TIME_WINDOW_DETECTION_LOG_FILE,"a");
+      if (fptr == NULL) {
+        perror("Failed to open TIME_WINDOW_DETECTION_LOG_FILE");
+        // return;  // or handle the error as needed
+        int_exit(1);
+      }
+      fprintf(fptr,"%d,%d,%d,%d\n",
+              num_purecells,
+              numHashCollisions,
+              flow_set.num_flows_collide_all_indices,
+              flow_set.num_flows_all_new_cells);
+      fclose(fptr);
+      printf("Write complete\n");
+
+
+    }
+
+
+
+    //normal epoch
     loop++;
     printf("\nPoll No : %d\n", loop);
 
@@ -76,17 +186,20 @@ void *flowset_switcher_thread(void *arg){
     bpf_map_lookup_elem(flowset_id_fd, &first, &current);
 
 
-    if(current.id){
+    if(current.id==flowset_enum_1){
       curr_flowset_fd=flowset_fd_1;
       printf("Flowset 1 in use\n");
-    }else{
+    }else if(current.id==flowset_enum_0){
       curr_flowset_fd=flowset_fd_0;
       printf("Flowset 0 in use\n");
+    }else{
+      fprintf(stderr,"Invalid flowset_fd\n");
+      int_exit(1);
     }
   
     printf("Inverting the flowset\n");
     //invert Flowset_ID
-    current.id=!(current.id);
+    current.id=current.id==flowset_enum_0?flowset_enum_1:flowset_enum_0;
     //wait till lock release to update
     bpf_map_update_elem(flowset_id_fd, &first, &current, BPF_F_LOCK);
     // if(ret<0){
@@ -291,8 +404,10 @@ int main(int argc, char *argv[]) {
   initialize_flowset(Flowset_fd_1);
 
   //initialize Flowset_ID
-  bool set=false;
-  bpf_map_update_elem(Flowset_id_fd, &first, &set, BPF_ANY);
+  struct flowset_id_struct current;
+  // bool set=false;
+  current.id=flowset_enum_0;
+  bpf_map_update_elem(Flowset_id_fd, &first, &current, BPF_ANY);
   // if(ret<0){
   //   return ret;
   // }

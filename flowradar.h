@@ -30,6 +30,11 @@
 #define POLL_TIME_MS  280  //in milliseconds (280)
 #define POLL_TIME_US POLL_TIME_MS*1000   // in microseconds
 
+#define DETECTION_TIME_WINDOW_MS  28   //in milliseconds
+#define DETECTION_TIME_WINDOW_US DETECTION_TIME_WINDOW_MS*1000  //in microseconds
+
+#define DETECTION_WINDOWS_PER_EPOCH POLL_TIME_MS/DETECTION_TIME_WINDOW_MS   //10
+
 
 #define RING_BUFFER_SIZE 100
 #define RING_BUFFER_FULL_WAIT_TIME  5  //in seconds
@@ -38,6 +43,7 @@
 #define SINGLE_DECODE_LOG_FILE "sd_logs.csv"
 #define COUNTER_DECODE_LOG_FILE "cd_logs.csv"
 #define DETECTION_LOG_FILE "detect.csv"
+#define TIME_WINDOW_DETECTION_LOG_FILE "window_detect.csv"
 
 
 struct pureset {
@@ -60,9 +66,12 @@ struct flowset {
   int num_flows_all_new_cells;  //for detection mechanism
 };
 
+
+enum flowset_id_enum{flowset_enum_0,flowset_enum_1,wait_enum};
+
 struct flowset_id_struct{
   struct bpf_spin_lock lock;
-  bool id;
+  enum flowset_id_enum id;
 };
 
 struct network_flow {

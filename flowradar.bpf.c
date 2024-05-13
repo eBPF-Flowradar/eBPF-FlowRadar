@@ -13,6 +13,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include <limits.h>
 
 
 //Stucture to decide which flowset should be used
@@ -214,13 +215,28 @@ int xdp_parse_flow(struct xdp_md *ctx) {
   //start only when flowset_id  and flowsets are initialized
   if(flowset_id_ptr && flowset_0 && flowset_1){
 
+    //bounded wait loop
+    //TODO: Find a better way of doing these
+    for(int i=0;i<INT_MAX;i++){
+      if(flowset_id_ptr->id!=wait_enum){
+        break;
+      }
+    }
+
+    //check for error
+    if(flowset_id_ptr->id==wait_enum){
+      bpf_printk("Invalid Flowset");
+      return XDP_PASS;
+    }
+
+
     bpf_spin_lock(&flowset_id_ptr->lock);
 
-    bool flowset_id=flowset_id_ptr->id;
+    enum flowset_id_enum flowset_id=flowset_id_ptr->id;
     struct flowset *curr_flowset=NULL;
 
 
-    if(flowset_id){
+    if(flowset_id==flowset_enum_1){
       curr_flowset=flowset_1;
     }else{
       curr_flowset=flowset_0;
