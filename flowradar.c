@@ -291,7 +291,9 @@ int main(int argc, char *argv[]) {
   initialize_flowset(Flowset_fd_1);
 
   //initialize Flowset_ID
-  bool set=false;
+  struct flowset_id_struct set;
+  set.id=false;
+  // bool set=false;
   bpf_map_update_elem(Flowset_id_fd, &first, &set, BPF_ANY);
   // if(ret<0){
   //   return ret;
