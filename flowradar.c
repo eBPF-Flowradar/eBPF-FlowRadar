@@ -38,7 +38,7 @@ struct flowset empty_flowset;
 
 
 static void int_exit(int sig) {
-  pthread_cancel(thread_id);
+  // pthread_cancel(thread_id);
   xdp_program__detach(prog, ifindex, XDP_MODE_SKB, 0);
   xdp_program__close(prog);
   exit(sig);
