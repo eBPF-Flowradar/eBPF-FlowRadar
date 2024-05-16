@@ -40,6 +40,15 @@ struct {
 } Flow_set_1 SEC(".maps");
 
 
+//Define start (used to signal the start of decode)  //TODO: find better ways
+struct {
+  __uint(type, BPF_MAP_TYPE_ARRAY);
+  __type(key, int);
+  __type(value, bool);
+  __uint(max_entries, 1);
+} start SEC(".maps");
+
+
 
 static __always_inline int insert_to_flow_filter(__u128 flow_key,struct flowset *curr_flowset) {
   
@@ -207,9 +216,15 @@ int xdp_parse_flow(struct xdp_md *ctx) {
 
   //Get the ID of the flowset to which the flow should be inserted
   int first=0;
+  bool True=true;
   struct flowset_id_struct *flowset_id_ptr = bpf_map_lookup_elem(&Flowset_ID, &first);
   struct flowset *flowset_0=bpf_map_lookup_elem(&Flow_set_0,&first);
   struct flowset *flowset_1=bpf_map_lookup_elem(&Flow_set_1,&first);
+
+  //set the start variable to True (There  could be better ways)
+  bpf_map_update_elem(&start,&first,&True,BPF_ANY);
+
+
   
   //start only when flowset_id  and flowsets are initialized
   if(flowset_id_ptr && flowset_0 && flowset_1){

@@ -401,6 +401,7 @@ int main(int argc, char *argv[]) {
 
   //get fd of flowset_id
   int Flowset_id_fd=bpf_object__find_map_fd_by_name(bpf_obj, "Flowset_ID");
+  int start_fd=bpf_object__find_map_fd_by_name(bpf_obj,"start");
 
 
   initialize_flowset(Flowset_fd_0);
@@ -414,6 +415,11 @@ int main(int argc, char *argv[]) {
   // if(ret<0){
   //   return ret;
   // }
+
+  //initialize start
+  bool start_bool=false;
+  bpf_map_update_elem(start_fd,&first,&start_bool,BPF_ANY);
+
 
   //remove log files if exist
   remove(SINGLE_DECODE_LOG_FILE);
@@ -450,7 +456,11 @@ int main(int argc, char *argv[]) {
   args.flowset_fd_1=Flowset_fd_1;
   args.flowset_id_fd=Flowset_id_fd;
 
-
+  printf("Waiting for packets to arrive\n");
+  while(!start_bool){
+    bpf_map_lookup_elem(start_fd,&first,&start_bool);
+  }
+  
   //create thread for flowset switcher and detection logs thread
   pthread_create(&flow_switcher_thread_id,NULL,flowset_switcher_thread,(void*)&args);
   pthread_create(&detection_logs_thread_id,NULL,detection_logs_thread,NULL);
