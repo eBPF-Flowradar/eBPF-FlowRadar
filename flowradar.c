@@ -158,7 +158,7 @@ void *flowset_switcher_thread(void *arg){
       printf("--------------------------------------------------------------\n");
       sleep(RING_BUFFER_FULL_WAIT_TIME);
     }
-    // printf("Flow Switcher: Number of elements in the ring buffer: %d\n",flowset_ring_buffer.count);
+    printf("Flow Switcher: Number of elements in the ring buffer: %d\n",flowset_ring_buffer.count);
     poll++;
   }
 }
@@ -337,9 +337,9 @@ static void start_decode() {
       
       //perform counter decode
       // printf("\nStarting Counter Decode\n");
-      if(counter_decode(&pure_set,pktCount)){
-        return;
-      }
+      // if(counter_decode(&pure_set,pktCount)){
+      //   return;
+      // }
 
       printf("Main Thread: Number of elements left in the ring buffer: %d\n",flowset_ring_buffer.count);  
 
