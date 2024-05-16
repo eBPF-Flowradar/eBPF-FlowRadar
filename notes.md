@@ -51,7 +51,7 @@
 13. Support for IPv6?
 14. Make a circular queue structure for flowset [x][resource](https://embedjournal.com/implementing-circular-buffer-embedded-c/)
 15. Remove veth (uneccasary)[x]
-16. Make the window collection to a queue and process on a seperate thread
+16. Make the window collection to a queue and process on a seperate thread[x]
 17. Try to make RCU update in ebpf code (update the map at the end)
 
 # Errors
