@@ -19,7 +19,7 @@
 static int ifindex;
 struct xdp_program *prog = NULL;
 int first=0; //used for accessing the only element in flowset_id
-pthread_t thread_id;
+
 
 
 //defining ring buffer
@@ -31,6 +31,17 @@ struct ring_buffer flowset_ring_buffer ={
   .count=0,
   .maxlen=RING_BUFFER_SIZE
 };
+
+//defining detection ring buffer
+struct flowset detection_buffer[DETECTION_RING_BUFFER_SIZE];
+struct ring_buffer detection_ring_buffer={
+  .buffer=detection_buffer,
+  .head=0,
+  .tail=0,
+  .count=0,
+  .maxlen=DETECTION_RING_BUFFER_SIZE
+};
+
 
 
 //relying on automatic init by compiler
@@ -67,7 +78,6 @@ void *flowset_switcher_thread(void *arg){
   while(true){
 
     // usleep(POLL_TIME_US);
-    
     struct flowset flow_set;
 
     //Get map currently in use
@@ -75,52 +85,98 @@ void *flowset_switcher_thread(void *arg){
     int curr_flowset_fd;
     bpf_map_lookup_elem(flowset_id_fd, &first, &current);
 
+    // printf("\nPoll No : %d\n", poll);
+
     if(current.id){
       curr_flowset_fd=flowset_fd_1;
-      printf("Flowset 1 in use\n");
+      // printf("Flowset 1 in use\n");
     }else{
       curr_flowset_fd=flowset_fd_0;
-      printf("Flowset 0 in use\n");
+      // printf("Flowset 0 in use\n");
     }
 
     //detection mechanism
     for(int window=1;window<=DETECTION_WINDOWS_PER_EPOCH;window++){
 
       usleep(DETECTION_TIME_WINDOW_US);
-      printf("Detection time window: %d/%d\n",window,DETECTION_WINDOWS_PER_EPOCH);
+      // printf("Detection time window: %d/%d\n",window,DETECTION_WINDOWS_PER_EPOCH);
 
 
-      printf("Getting the flowset from kernel space\n");
+      // printf("Getting the flowset from kernel space\n");
       bpf_map_lookup_elem(curr_flowset_fd,&first,&flow_set);
 
       //if flowset empty, not required to proceed
       if(flow_set.pkt_count==0){
-        printf("Flowset empty!!!\n");
-        //Writing to detection log file
-        printf("\nWriting to Window Detection Log file\n");
-        fptr=fopen(TIME_WINDOW_DETECTION_LOG_FILE,"a");
-
-        if (fptr == NULL) {
-          perror("Failed to open DETECTION_LOG_FILE");
-          int_exit(1);
-          //return;  //TODO: check here or handle the error as needed
-        }
-        fprintf(fptr,"%d,%d,0,0,0,0\n",
-                poll,
-                window);
-        fclose(fptr);
-        printf("Write complete\n");
-
+        // printf("Flowset empty!!!\n");
         continue;
       }
 
+      //insert poll and window info to flowset
+      flow_set.poll_num=poll;
+      flow_set.window=window;
+
+      if(ring_buf_push(&detection_ring_buffer,flow_set)){
+        fprintf(stderr,"Error: detection_ring_buffer full\n");
+        int_exit(1);
+      }
+
+    }
+
+
+
+    // printf("Inverting the flowset\n");
+    //invert Flowset_ID
+    current.id=!(current.id);
+    //wait till lock release to update
+    bpf_map_update_elem(flowset_id_fd, &first, &current, BPF_F_LOCK);
+    // if(ret<0){
+    //   return ret;
+    // }
+
+    // printf("Getting the flowset from kernel space\n");
+    bpf_map_lookup_elem(curr_flowset_fd,&first,&flow_set);
+
+    if(flow_set.pkt_count==0){
+      // printf("Flowset empty!!!\n");
+      poll++;
+      continue;
+    }
+
+    // printf("\nFlow Switcher: Poll No : %d Number of Packets:%d\n", poll,flow_set.pkt_count);
+
+    //insert poll info to flowset
+    flow_set.poll_num=poll;
+
+    //reset the flowset 
+    // printf("Reset the flowset in kernel space\n");
+    initialize_flowset(curr_flowset_fd);
+
+    //add the flowset to ring buffer, if full wait till free space
+    while(ring_buf_push(&flowset_ring_buffer,flow_set)){
+      printf("--------------------------------------------------------------\n");
+      printf("Flow Switcher: Ring buffer full. Waiting for %d seconds\n",RING_BUFFER_FULL_WAIT_TIME);
+      printf("--------------------------------------------------------------\n");
+      sleep(RING_BUFFER_FULL_WAIT_TIME);
+    }
+    // printf("Flow Switcher: Number of elements in the ring buffer: %d\n",flowset_ring_buffer.count);
+    poll++;
+  }
+}
+
+
+void *detection_logs_thread(){
+
+  struct flowset flow_set;
+
+  while(true){
+
+    if(!ring_buf_pop(&detection_ring_buffer,&flow_set)){
+
       int numHashCollisions=0;    //Data for detection mechanism
 
-      // printf("FlowXOR ,FlowCount ,PacketCount\n");
       for(int i=0;i<COUNTING_TABLE_SIZE;i++){
 
         struct counting_table_entry cte=flow_set.counting_table[i];
-        
         //only new flows
         // if(cte.flowCount>1){
         //   numHashCollisions+=cte.flowCount-1;
@@ -137,7 +193,7 @@ void *flowset_switcher_thread(void *arg){
       struct pureset pure_set;
       pure_set.latest_index=0;
       //perform single decode till there are no pure cells left
-      printf("\nStarting single decode\n");
+      // printf("\nStarting single decode\n");
       int init_index=0;  //index of the first purecell
       while((init_index=check_purecells(&flow_set))!=-1){
 
@@ -151,7 +207,8 @@ void *flowset_switcher_thread(void *arg){
       int num_purecells=pure_set.latest_index;
 
       //Writing to detection log file
-      printf("\nWriting to Window Detection Log file\n");
+      // printf("\nWriting to Window Detection Log file\n");
+      FILE *fptr;
       fptr=fopen(TIME_WINDOW_DETECTION_LOG_FILE,"a");
       if (fptr == NULL) {
         perror("Failed to open TIME_WINDOW_DETECTION_LOG_FILE");
@@ -159,56 +216,16 @@ void *flowset_switcher_thread(void *arg){
         int_exit(1);
       }
       fprintf(fptr,"%d,%d,%d,%d,%d,%d\n",
-              poll,
-              window,
+              flow_set.poll_num,
+              flow_set.window,
               num_purecells,
               numHashCollisions,
               flow_set.num_flows_collide_all_indices,
               flow_set.num_flows_all_new_cells);
       fclose(fptr);
-      printf("Write complete\n");
-
+      // printf("Write complete\n");
+      printf("Detection Logs: Elements left in detection ring buffer:%d\n",detection_ring_buffer.count);
     }
-
-
-
-
-    printf("\nPoll No : %d\n", poll);
-
-    printf("Inverting the flowset\n");
-    //invert Flowset_ID
-    current.id=!(current.id);
-    //wait till lock release to update
-    bpf_map_update_elem(flowset_id_fd, &first, &current, BPF_F_LOCK);
-    // if(ret<0){
-    //   return ret;
-    // }
-
-    printf("Getting the flowset from kernel space\n");
-    bpf_map_lookup_elem(curr_flowset_fd,&first,&flow_set);
-
-    if(flow_set.pkt_count==0){
-      printf("Flowset empty!!!\n");
-      poll++;
-      continue;
-    }
-
-    //insert poll info to flowset
-    flow_set.poll_num=poll;
-
-    //reset the flowset 
-    printf("Reset the flowset in kernel space\n");
-    initialize_flowset(curr_flowset_fd);
-
-    //add the flowset to ring buffer, if full wait till free space
-    while(ring_buf_push(&flowset_ring_buffer,flow_set)){
-      printf("--------------------------------------------------------------\n");
-      printf("Flow Switcher: Ring buffer full. Waiting for %d seconds\n",RING_BUFFER_FULL_WAIT_TIME);
-      printf("--------------------------------------------------------------\n");
-      sleep(RING_BUFFER_FULL_WAIT_TIME);
-    }
-    printf("Number of elements in the ring buffer: %d\n",flowset_ring_buffer.count);
-    poll++;
   }
 }
 
@@ -224,7 +241,7 @@ static void start_decode() {
 
     if(!ring_buf_pop(&flowset_ring_buffer,&flow_set)){
 
-      printf("Number of elements in the ring buffer: %d\n",flowset_ring_buffer.count);
+      
 
       double pktCount[COUNTING_TABLE_SIZE];  //double because to use in gsl
       int numHashCollisions=0;    //Data for detection mechanism
@@ -255,13 +272,13 @@ static void start_decode() {
       }
 
 
-      printf("Number of packets in flowset:%d\n",flow_set.pkt_count);
+      // printf("Number of packets in flowset:%d\n",flow_set.pkt_count);
 
       //perform single decode and print the purecells
       struct pureset pure_set;
       pure_set.latest_index=0;
       //perform single decode till there are no pure cells left
-      printf("\nStarting single decode\n");
+      // printf("\nStarting single decode\n");
       int init_index=0;  //index of the first purecell
       while((init_index=check_purecells(&flow_set))!=-1){
 
@@ -272,9 +289,9 @@ static void start_decode() {
       }
 
       int num_purecells=pure_set.latest_index;
-      printf("Single Decode Complete.....\nNumber of PureCells:%d\n",num_purecells);
+      // printf("Single Decode Complete.....\nNumber of PureCells:%d\n",num_purecells);
 
-      printf("Writing to log file\n");
+      // printf("Writing to log file\n");
       FILE *fptr;
       fptr=fopen(SINGLE_DECODE_LOG_FILE,"a");
 
@@ -298,11 +315,11 @@ static void start_decode() {
       }
 
       fclose(fptr);
-      printf("Write complete\n");
+      // printf("Write complete\n");
 
       
       //Writing to detection log file
-      printf("\nWriting to Detection Log file\n");
+      // printf("\nWriting to Detection Log file\n");
       fptr=fopen(DETECTION_LOG_FILE,"a");
       if (fptr == NULL) {
         perror("Failed to open DETECTION_LOG_FILE");
@@ -315,15 +332,17 @@ static void start_decode() {
               flow_set.num_flows_collide_all_indices,
               flow_set.num_flows_all_new_cells);
       fclose(fptr);
-      printf("Write complete\n");
+      // printf("Write complete\n");
 
       
       //perform counter decode
-      printf("\nStarting Counter Decode\n");
+      // printf("\nStarting Counter Decode\n");
       if(counter_decode(&pure_set,pktCount)){
         return;
       }
-        
+
+      printf("Main Thread: Number of elements left in the ring buffer: %d\n",flowset_ring_buffer.count);  
+
     }
 
   }
@@ -333,6 +352,8 @@ int main(int argc, char *argv[]) {
 
   int prog_fd, map_fd, ret;
   struct bpf_object *bpf_obj;
+
+  pthread_t flow_switcher_thread_id,detection_logs_thread_id;
 
   //check if necessary (setting resource limits to infinity)
   struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
@@ -430,8 +451,9 @@ int main(int argc, char *argv[]) {
   args.flowset_id_fd=Flowset_id_fd;
 
 
-  //create thread for flowset switcher
-  pthread_create(&thread_id,NULL,flowset_switcher_thread,(void*)&args);
+  //create thread for flowset switcher and detection logs thread
+  pthread_create(&flow_switcher_thread_id,NULL,flowset_switcher_thread,(void*)&args);
+  pthread_create(&detection_logs_thread_id,NULL,detection_logs_thread,NULL);
 
 
   printf("\nStarting Decode function\n");

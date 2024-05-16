@@ -34,10 +34,12 @@
 #define DETECTION_TIME_WINDOW_MS  28   //in milliseconds
 #define DETECTION_TIME_WINDOW_US DETECTION_TIME_WINDOW_MS*1000  //in microseconds
 
-#define DETECTION_WINDOWS_PER_EPOCH POLL_TIME_MS/DETECTION_TIME_WINDOW_MS   //10
+#define DETECTION_WINDOWS_PER_EPOCH   POLL_TIME_MS/DETECTION_TIME_WINDOW_MS   //10
 
 #define RING_BUFFER_SIZE 100
 #define RING_BUFFER_FULL_WAIT_TIME  5  //in seconds
+
+#define DETECTION_RING_BUFFER_SIZE   RING_BUFFER_SIZE/4
 
 
 #define SINGLE_DECODE_LOG_FILE "sd_logs.csv"
@@ -65,6 +67,7 @@ struct flowset {
   int num_flows_collide_all_indices;  //for detection mechanism
   int num_flows_all_new_cells;  //for detection mechanism
   int poll_num;
+  int window;
 };
 
 struct flowset_id_struct{

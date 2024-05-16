@@ -57,13 +57,13 @@ int counter_decode(struct pureset *pure_set, double *pktCount) {
 
   
   // Perform least squares fitting
-  printf("Solving equations!!\n");
+  // printf("Solving equations!!\n");
   gsl_multifit_linear(A, B, x, cov, &chisq, work);
 
   
-  printf("Counter Decode complete...\n");
+  // printf("Counter Decode complete...\n");
 
-  printf("Writing to log file\n");
+  // printf("Writing to log file\n");
   FILE *fptr;
   fptr=fopen(COUNTER_DECODE_LOG_FILE,"a");
 
@@ -90,7 +90,7 @@ int counter_decode(struct pureset *pure_set, double *pktCount) {
   }
 
   fclose(fptr);
-  printf("Write complete\n");
+  // printf("Write complete\n");
 
   // Free memory that is used
   gsl_multifit_linear_free(work);
