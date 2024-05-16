@@ -159,7 +159,7 @@ void *flowset_switcher_thread(void *arg){
         int_exit(1);
       }
       fprintf(fptr,"%d,%d,%d,%d,%d,%d\n",
-              flow_set.poll_num,
+              poll,
               window,
               num_purecells,
               numHashCollisions,
