@@ -16,28 +16,28 @@
 
 
 //Stucture to decide which flowset should be used
-struct {
-  __uint(type, BPF_MAP_TYPE_ARRAY);
-  __type(key, int);
-  __type(value, struct flowset_id_struct);
-  __uint(max_entries, 1);
-} Flowset_ID SEC(".maps");
+// struct {
+//   __uint(type, BPF_MAP_TYPE_ARRAY);
+//   __type(key, int);
+//   __type(value, struct flowset_id_struct);
+//   __uint(max_entries, 1);
+// } Flowset_ID SEC(".maps");
 
-//Define Flow Set 0
+//Define Flow Set
 struct {
-  __uint(type, BPF_MAP_TYPE_ARRAY);
+  __uint(type, BPF_MAP_TYPE_HASH);
   __type(key, int);
   __type(value, struct flowset);
   __uint(max_entries, 1);
-} Flow_set_0 SEC(".maps");
+} Flow_set SEC(".maps");
 
-//Define Flow Set 1
-struct {
-  __uint(type, BPF_MAP_TYPE_ARRAY);
-  __type(key, int);
-  __type(value, struct flowset);
-  __uint(max_entries, 1);
-} Flow_set_1 SEC(".maps");
+// //Define Flow Set 1
+// struct {
+//   __uint(type, BPF_MAP_TYPE_ARRAY);
+//   __type(key, int);
+//   __type(value, struct flowset);
+//   __uint(max_entries, 1);
+// } Flow_set_1 SEC(".maps");
 
 
 //Define start (used to signal the start of decode)  //TODO: find better ways
@@ -217,9 +217,10 @@ int xdp_parse_flow(struct xdp_md *ctx) {
   //Get the ID of the flowset to which the flow should be inserted
   int first=0;
   bool True=true;
-  struct flowset_id_struct *flowset_id_ptr = bpf_map_lookup_elem(&Flowset_ID, &first);
-  struct flowset *flowset_0=bpf_map_lookup_elem(&Flow_set_0,&first);
-  struct flowset *flowset_1=bpf_map_lookup_elem(&Flow_set_1,&first);
+  // struct flowset_id_struct *flowset_id_ptr = bpf_map_lookup_elem(&Flowset_ID, &first);
+  // struct flowset *flowset_0=bpf_map_lookup_elem(&Flow_set_0,&first);
+  // struct flowset *flowset_1=bpf_map_lookup_elem(&Flow_set_1,&first);
+  struct flowset *flowset_ptr=bpf_map_lookup_elem(&Flow_set,&first);
 
   //set the start variable to True (There  could be better ways)
   bpf_map_update_elem(&start,&first,&True,BPF_ANY);
@@ -227,19 +228,19 @@ int xdp_parse_flow(struct xdp_md *ctx) {
 
   
   //start only when flowset_id  and flowsets are initialized
-  if(flowset_id_ptr && flowset_0 && flowset_1){
+  if(flowset_ptr){
 
-    bpf_spin_lock(&flowset_id_ptr->lock);
+    bpf_spin_lock(&flowset_ptr->lock);
 
-    bool flowset_id=flowset_id_ptr->id;
-    struct flowset *curr_flowset=NULL;
+    // bool flowset_id=flowset_id_ptr->id;
+    // struct flowset *curr_flowset=NULL;
 
 
-    if(flowset_id){
-      curr_flowset=flowset_1;
-    }else{
-      curr_flowset=flowset_0;
-    }
+    // if(flowset_id){
+    //   curr_flowset=flowset_1;
+    // }else{
+    //   curr_flowset=flowset_0;
+    // }
 
     //expanding network flow to 128 bits (Check:Is is possible without this?)
     __u128 flow_key;
@@ -247,16 +248,16 @@ int xdp_parse_flow(struct xdp_md *ctx) {
     
     
     //checking whether old flow and insert if its not
-    if (is_old_flow(flow_key,curr_flowset)) {
+    if (is_old_flow(flow_key,flowset_ptr)) {
       old_flow = true;
     } else {
-      insert_to_flow_filter(flow_key,curr_flowset);
+      insert_to_flow_filter(flow_key,flowset_ptr);
     }
 
-    insert_flow_to_counting_table(flow_key, old_flow,curr_flowset);
-    curr_flowset->pkt_count++;
+    insert_flow_to_counting_table(flow_key, old_flow,flowset_ptr);
+    flowset_ptr->pkt_count++;
 
-    bpf_spin_unlock(&flowset_id_ptr->lock);
+    bpf_spin_unlock(&flowset_ptr->lock);
 
   }
 

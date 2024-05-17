@@ -68,12 +68,13 @@ struct flowset {
   int num_flows_all_new_cells;  //for detection mechanism
   int poll_num;
   int window;
+  struct bpf_spin_lock lock;
 };
 
-struct flowset_id_struct{
-  struct bpf_spin_lock lock;
-  bool id;
-};
+// struct flowset_id_struct{
+//   struct bpf_spin_lock lock;
+//   bool id;
+// };
 
 struct network_flow {
   __u32 source_ip;
@@ -92,9 +93,10 @@ struct ring_buffer{
 };
 
 struct thread_args{
-  int flowset_fd_0;
-  int flowset_fd_1;
-  int flowset_id_fd;
+  // int flowset_fd_0;
+  // int flowset_fd_1;
+  // int flowset_id_fd;
+  int flowset_fd;
 };
 
 

@@ -69,9 +69,10 @@ void *flowset_switcher_thread(void *arg){
   int poll=1;
   struct thread_args *args = (struct thread_args*)arg;
 
-  int flowset_fd_0=args->flowset_fd_0;
-  int flowset_fd_1=args->flowset_fd_1;
-  int flowset_id_fd=args->flowset_id_fd;
+  // int flowset_fd_0=args->flowset_fd_0;
+  // int flowset_fd_1=args->flowset_fd_1;
+  // int flowset_id_fd=args->flowset_id_fd;
+  int flowset_fd=args->flowset_fd;
 
   FILE *fptr;
 
@@ -81,19 +82,19 @@ void *flowset_switcher_thread(void *arg){
     struct flowset flow_set;
 
     //Get map currently in use
-    struct flowset_id_struct current;
-    int curr_flowset_fd;
-    bpf_map_lookup_elem(flowset_id_fd, &first, &current);
+    // struct flowset_id_struct current;
+    // int curr_flowset_fd;
+    // bpf_map_lookup_elem(flowset_id_fd, &first, &current);
 
     // printf("\nPoll No : %d\n", poll);
 
-    if(current.id){
-      curr_flowset_fd=flowset_fd_1;
-      // printf("Flowset 1 in use\n");
-    }else{
-      curr_flowset_fd=flowset_fd_0;
-      // printf("Flowset 0 in use\n");
-    }
+    // if(current.id){
+    //   curr_flowset_fd=flowset_fd_1;
+    //   // printf("Flowset 1 in use\n");
+    // }else{
+    //   curr_flowset_fd=flowset_fd_0;
+    //   // printf("Flowset 0 in use\n");
+    // }
 
     //detection mechanism
     for(int window=1;window<=DETECTION_WINDOWS_PER_EPOCH;window++){
@@ -103,7 +104,10 @@ void *flowset_switcher_thread(void *arg){
 
 
       // printf("Getting the flowset from kernel space\n");
-      bpf_map_lookup_elem(curr_flowset_fd,&first,&flow_set);
+      if(bpf_map_lookup_elem_flags(flowset_fd,&first,&flow_set,BPF_F_LOCK)){
+        perror("Map lookup");
+        int_exit(1);
+      }
 
       //if flowset empty, not required to proceed
       if(flow_set.pkt_count==0){
@@ -128,15 +132,21 @@ void *flowset_switcher_thread(void *arg){
 
     // printf("Inverting the flowset\n");
     //invert Flowset_ID
-    current.id=!(current.id);
-    //wait till lock release to update
-    bpf_map_update_elem(flowset_id_fd, &first, &current, BPF_F_LOCK);
+    // current.id=!(current.id);
+    // //wait till lock release to update
+    // bpf_map_update_elem(flowset_id_fd, &first, &current, BPF_F_LOCK);
     // if(ret<0){
     //   return ret;
     // }
 
     // printf("Getting the flowset from kernel space\n");
-    bpf_map_lookup_elem(curr_flowset_fd,&first,&flow_set);
+    if(bpf_map_lookup_and_delete_elem_flags(flowset_fd,&first,&flow_set,BPF_F_LOCK)){
+      perror("bpf lookup and delete");
+      int_exit(1);
+    }
+
+
+
 
     if(flow_set.pkt_count==0){
       // printf("Flowset empty!!!\n");
@@ -151,7 +161,7 @@ void *flowset_switcher_thread(void *arg){
 
     //reset the flowset 
     // printf("Reset the flowset in kernel space\n");
-    initialize_flowset(curr_flowset_fd);
+    // initialize_flowset(flowset_fd);
 
     //add the flowset to ring buffer, if full wait till free space
     while(ring_buf_push(&flowset_ring_buffer,flow_set)){
@@ -398,22 +408,24 @@ int main(int argc, char *argv[]) {
   bpf_obj = xdp_program__bpf_obj(prog);
 
   //get fds of flowsets
-  int Flowset_fd_0=bpf_object__find_map_fd_by_name(bpf_obj, "Flow_set_0");
-  int Flowset_fd_1=bpf_object__find_map_fd_by_name(bpf_obj, "Flow_set_1");
+  // int Flowset_fd_0=bpf_object__find_map_fd_by_name(bpf_obj, "Flow_set_0");
+  // int Flowset_fd_1=bpf_object__find_map_fd_by_name(bpf_obj, "Flow_set_1");
+  int Flowset_fd=bpf_object__find_map_fd_by_name(bpf_obj, "Flow_set");
 
   //get fd of flowset_id
-  int Flowset_id_fd=bpf_object__find_map_fd_by_name(bpf_obj, "Flowset_ID");
+  // int Flowset_id_fd=bpf_object__find_map_fd_by_name(bpf_obj, "Flowset_ID");
   int start_fd=bpf_object__find_map_fd_by_name(bpf_obj,"start");
 
 
-  initialize_flowset(Flowset_fd_0);
-  initialize_flowset(Flowset_fd_1);
+  // initialize_flowset(Flowset_fd_0);
+  // initialize_flowset(Flowset_fd_1);
+  initialize_flowset(Flowset_fd);
 
   //initialize Flowset_ID
-  struct flowset_id_struct set;
-  set.id=false;
-  // bool set=false;
-  bpf_map_update_elem(Flowset_id_fd, &first, &set, BPF_ANY);
+  // struct flowset_id_struct set;
+  // set.id=false;
+  // // bool set=false;
+  // bpf_map_update_elem(Flowset_id_fd, &first, &set, BPF_ANY);
   // if(ret<0){
   //   return ret;
   // }
@@ -454,9 +466,10 @@ int main(int argc, char *argv[]) {
 
   //prepare arguments to the thread
   struct thread_args args;
-  args.flowset_fd_0=Flowset_fd_0;
-  args.flowset_fd_1=Flowset_fd_1;
-  args.flowset_id_fd=Flowset_id_fd;
+  // args.flowset_fd_0=Flowset_fd_0;
+  // args.flowset_fd_1=Flowset_fd_1;
+  // args.flowset_id_fd=Flowset_id_fd;
+  args.flowset_fd=Flowset_fd;
 
   printf("Waiting for packets to arrive\n");
   while(!start_bool){
