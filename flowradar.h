@@ -27,11 +27,11 @@
  
 #define PURE_SET_SIZE COUNTING_TABLE_SIZE    //TODO:need to check this
 
-#define POLL_TIME_MS  440//280  //in milliseconds (280)
+#define POLL_TIME_MS  400//430//280  //in milliseconds (280)
 #define POLL_TIME_US POLL_TIME_MS*1000   // in microseconds
 
 
-#define DETECTION_TIME_WINDOW_MS  44//28   //in milliseconds
+#define DETECTION_TIME_WINDOW_MS  10//28   //in milliseconds
 #define DETECTION_TIME_WINDOW_US DETECTION_TIME_WINDOW_MS*1000  //in microseconds
 
 #define DETECTION_WINDOWS_PER_EPOCH   POLL_TIME_MS/DETECTION_TIME_WINDOW_MS   //10

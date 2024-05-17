@@ -53,6 +53,7 @@
 15. Remove veth (uneccasary)[x]
 16. Make the window collection to a queue and process on a seperate thread[x]
 17. Try to make RCU update in ebpf code (update the map at the end)
+18. Solve the error due to pureset_index exceeeding size of pureset (It occurs only sometimes)
 
 # Errors
 1. Errors due to empty flowsets being passed down to gsl [x]
@@ -72,6 +73,9 @@
 1. The 110k_24k_caida.pcap has raw ip packets without the ethernet header, this causes issues with our program as it expects ethernet headers, currently while testing with scapy we are adding the ethernet headers and sending to the interface.
 2. Only supporting IP packets (no IPv6)
 3. Counter decode done with gsl library.Packets rounded to nearest integer after calculation (instead of simplifying the calculation)
+4. alen_circular_queue - flowradar with detection log collection at every epoch
+   alen_window_detection - flowradar with detection log collection at every time window per epoch
+   alen_single_flowet - alen_window_detection with only single flowset
 
 # Resources to setup veth
 1. Run setup_br.sh
