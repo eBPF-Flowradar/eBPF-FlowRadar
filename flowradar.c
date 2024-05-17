@@ -119,6 +119,8 @@ void *flowset_switcher_thread(void *arg){
         fprintf(stderr,"Error: detection_ring_buffer full\n");
         int_exit(1);
       }
+      printf("Flow Switcher: Number of elements in the detection ring buffer: %d\n",detection_ring_buffer.count);
+
 
     }
 
