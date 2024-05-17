@@ -217,9 +217,10 @@ void *detection_logs_thread(){
         // return;  // or handle the error as needed
         int_exit(1);
       }
-      fprintf(fptr,"%d,%d,%d,%d,%d,%d\n",
+      fprintf(fptr,"%d,%d,%d,%d,%d,%d,%d\n",
               flow_set.poll_num,
               flow_set.window,
+              flow_set.pkt_count,
               num_purecells,
               numHashCollisions,
               flow_set.num_flows_collide_all_indices,
@@ -327,8 +328,9 @@ static void start_decode() {
         perror("Failed to open DETECTION_LOG_FILE");
         return;  // or handle the error as needed
       }
-      fprintf(fptr,"%d,%d,%d,%d,%d\n",
+      fprintf(fptr,"%d,%d,%d,%d,%d,%d\n",
               flow_set.poll_num,
+              flow_set.pkt_count,
               num_purecells,
               numHashCollisions,
               flow_set.num_flows_collide_all_indices,
@@ -438,7 +440,7 @@ int main(int argc, char *argv[]) {
         // return;  // or handle the error as needed
         int_exit(1);
   }
-  fprintf(fptr,"Poll_Num,Pure_Cells_Num,Hash_Collisions_Num,Flows_Collide_All_Indices_Num,Flows_Set_All_New_Cells_Num\n");
+  fprintf(fptr,"Poll_Num,Pkt_Count,Pure_Cells_Num,Hash_Collisions_Num,Flows_Collide_All_Indices_Num,Flows_Set_All_New_Cells_Num\n");
   fclose(fptr);
 
 
@@ -448,7 +450,7 @@ int main(int argc, char *argv[]) {
         // return;  // or handle the error as needed
         int_exit(1);
   }
-  fprintf(fptr,"Poll_Num,Time_Window,Pure_Cells_Num,Hash_Collisions_Num,Flows_Collide_All_Indices_Num,Flows_Set_All_New_Cells_Num\n");
+  fprintf(fptr,"Poll_Num,Time_Window,Pkt_Count,Pure_Cells_Num,Hash_Collisions_Num,Flows_Collide_All_Indices_Num,Flows_Set_All_New_Cells_Num\n");
   fclose(fptr);
 
 
