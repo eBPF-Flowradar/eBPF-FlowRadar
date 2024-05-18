@@ -22,19 +22,19 @@ fi
 PACKET_COUNT=$(capinfos "$PCAP_FILE" | grep "Number of packets ="| tr -d " " | cut -d "=" -f 2)
 
 # Calculate packets per second (PPS)
-if [ "$DURATION" -eq 0 ]; then
-    echo "Error: duration must be greater than 0"
-    exit 1
-fi
+# if [ "$DURATION" -eq 0 ]; then
+#     echo "Error: duration must be greater than 0"
+#     exit 1
+# fi
 
 PPS=$(echo "scale=2; $PACKET_COUNT / $DURATION" | bc)
 # PPS=$((PACKET_COUNT / DURATION))
 
 # Verify that PPS is greater than 0
-if [ "$PPS" -le 0 ]; then
-    echo "Error: calculated PPS is less than or equal to 0"
-    exit 1
-fi
+# if [ "$PPS" -le 0 ]; then
+#     echo "Error: calculated PPS is less than or equal to 0"
+#     exit 1
+# fi
 
 # Use tcpreplay to send packets at the calculated PPS rate
 tcpreplay --pps="$PPS" -i br0 "$PCAP_FILE"
