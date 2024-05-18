@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 # Check if the correct number of arguments are provided
 if [ "$#" -ne 1 ]; then
     echo "Usage: $0 <pcap_file>"
