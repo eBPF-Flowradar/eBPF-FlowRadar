@@ -174,7 +174,9 @@ void *detection_logs_thread(){
 
     if(!ring_buf_pop(&detection_ring_buffer,&flow_set)){
 
-      int numHashCollisions=0;    //Data for detection mechanism
+      //Data for detection mechanism
+      int numHashCollisions=0;
+      int num_purecells=0;
 
       for(int i=0;i<COUNTING_TABLE_SIZE;i++){
 
@@ -189,24 +191,28 @@ void *detection_logs_thread(){
           numHashCollisions+=cte.packetCount-1;
         }
 
-      }
-
-      //perform single decode
-      struct pureset pure_set;
-      pure_set.latest_index=0;
-      //perform single decode till there are no pure cells left
-      // printf("\nStarting single decode\n");
-      int init_index=0;  //index of the first purecell
-      while((init_index=check_purecells(&flow_set))!=-1){
-
-        if(single_decode(&flow_set,&pure_set,init_index)){
-          // return; TODO handle errors
-          int_exit(1);
+        if(cte.flowCount==1){
+          num_purecells++;
         }
 
       }
 
-      int num_purecells=pure_set.latest_index;
+      // //perform single decode
+      // struct pureset pure_set;
+      // pure_set.latest_index=0;
+      // //perform single decode till there are no pure cells left
+      // // printf("\nStarting single decode\n");
+      // int init_index=0;  //index of the first purecell
+      // while((init_index=check_purecells(&flow_set))!=-1){
+
+      //   if(single_decode(&flow_set,&pure_set,init_index)){
+      //     // return; TODO handle errors
+      //     int_exit(1);
+      //   }
+
+      // }
+
+      // int num_purecells=pure_set.latest_index;
 
       //Writing to detection log file
       // printf("\nWriting to Window Detection Log file\n");
@@ -247,7 +253,10 @@ static void start_decode() {
       
 
       double pktCount[COUNTING_TABLE_SIZE];  //double because to use in gsl
-      int numHashCollisions=0;    //Data for detection mechanism
+      
+      //Data for detection mechanism
+      int numHashCollisions=0;    
+      int num_purecells=0;
 
       // printf("FlowXOR ,FlowCount ,PacketCount\n");
       for(int i=0;i<COUNTING_TABLE_SIZE;i++){
@@ -263,6 +272,10 @@ static void start_decode() {
         //all flows
         if(cte.packetCount>1){
           numHashCollisions+=cte.packetCount-1;
+        }
+
+        if(cte.flowCount==1){
+          num_purecells++;
         }
 
         // if(cte.flowXOR){
@@ -291,7 +304,7 @@ static void start_decode() {
 
       }
 
-      int num_purecells=pure_set.latest_index;
+      int num_flows=pure_set.latest_index;
       // printf("Single Decode Complete.....\nNumber of PureCells:%d\n",num_purecells);
 
       // printf("Writing to log file\n");
@@ -303,9 +316,9 @@ static void start_decode() {
         return;  // or handle the error as needed
       }
 
-      for (int i = 0; i < num_purecells; i++) {
+      for (int i = 0; i < num_flows; i++) {
 
-        //printing the purecells
+        //printing the flows
         //printf("%" PRIx64 "%016" PRIx64 "\n",
         //(uint64_t)(pure_set.purecells[i] >> 64),
         //(uint64_t)pure_set.purecells[i]);
