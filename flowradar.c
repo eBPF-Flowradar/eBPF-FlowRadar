@@ -197,23 +197,6 @@ void *detection_logs_thread(){
 
       }
 
-      // //perform single decode
-      // struct pureset pure_set;
-      // pure_set.latest_index=0;
-      // //perform single decode till there are no pure cells left
-      // // printf("\nStarting single decode\n");
-      // int init_index=0;  //index of the first purecell
-      // while((init_index=check_purecells(&flow_set))!=-1){
-
-      //   if(single_decode(&flow_set,&pure_set,init_index)){
-      //     // return; TODO handle errors
-      //     int_exit(1);
-      //   }
-
-      // }
-
-      // int num_purecells=pure_set.latest_index;
-
       //Writing to detection log file
       // printf("\nWriting to Window Detection Log file\n");
       FILE *fptr;
