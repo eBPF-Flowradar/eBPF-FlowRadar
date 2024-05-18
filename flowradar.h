@@ -27,7 +27,7 @@
  
 #define PURE_SET_SIZE COUNTING_TABLE_SIZE    //TODO:need to check this
 
-#define POLL_TIME_MS  400//430//280  //in milliseconds (280)
+#define POLL_TIME_MS  280//400//430  //in milliseconds (280)
 #define POLL_TIME_US POLL_TIME_MS*1000   // in microseconds
 
 
