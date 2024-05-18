@@ -37,7 +37,7 @@ PPS=$(echo "scale=2; $PACKET_COUNT / $DURATION" | bc)
 # fi
 
 # Use tcpreplay to send packets at the calculated PPS rate
-tcpreplay --pps="$PPS" -i br0 "$PCAP_FILE"
+sudo tcpreplay --pps="$PPS" -i br0 "$PCAP_FILE"
 
 # Print some useful information
 echo "Sent $PACKET_COUNT packets from $PCAP_FILE over $DURATION seconds ($PPS packets per second)"
