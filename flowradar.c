@@ -17,14 +17,14 @@
 
 
 static int ifindex;
-struct xdp_program *prog = NULL;
-int first=0; //used for accessing the only element in flowset_id
+static struct xdp_program *prog = NULL;
+static int first=0; //used for accessing the only element in flowset_id
 
 
 
 //defining ring buffer
-struct flowset buffer[RING_BUFFER_SIZE];
-struct ring_buffer flowset_ring_buffer ={
+static struct flowset buffer[RING_BUFFER_SIZE];
+static struct ring_buffer flowset_ring_buffer ={
   .buffer=buffer,
   .head=0,
   .tail=0,
@@ -33,8 +33,8 @@ struct ring_buffer flowset_ring_buffer ={
 };
 
 //defining detection ring buffer
-struct flowset detection_buffer[DETECTION_RING_BUFFER_SIZE];
-struct ring_buffer detection_ring_buffer={
+static struct flowset detection_buffer[DETECTION_RING_BUFFER_SIZE];
+static struct ring_buffer detection_ring_buffer={
   .buffer=detection_buffer,
   .head=0,
   .tail=0,
@@ -45,7 +45,7 @@ struct ring_buffer detection_ring_buffer={
 
 
 //relying on automatic init by compiler
-struct flowset empty_flowset;
+static struct flowset empty_flowset;
 
 
 static void int_exit(int sig) {
@@ -64,7 +64,7 @@ static void inline initialize_flowset(int flowset_fd){
 
 
 //copies flowset from eBPF map to ring buffer and switches flowset in kernel space
-void *flowset_switcher_thread(void *arg){
+static void *flowset_switcher_thread(void *arg){
 
   int poll=1;
   struct thread_args *args = (struct thread_args*)arg;
@@ -166,7 +166,7 @@ void *flowset_switcher_thread(void *arg){
 }
 
 
-void *detection_logs_thread(){
+static void *detection_logs_thread(){
 
   struct flowset flow_set;
 
