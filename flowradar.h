@@ -64,10 +64,12 @@ struct flowset {
   struct counting_table_entry counting_table[COUNTING_TABLE_SIZE];
   bool flow_filter[FLOW_FILTER_SIZE];
   int pkt_count;
-  int num_flows_collide_all_indices;  //for detection mechanism
-  int num_flows_all_new_cells;  //for detection mechanism
-  int poll_num;
-  int window;
+  int input_flows;    //number of flows seen by the IBLT
+  int completely_colliding_flows;  //no. of flows that collide on all of their hash indices
+  int non_colliding_flows;  //no. of flows that do not collide on all of their hash indices
+  int purecell_all_collision; //number of collisions observed on pure cells
+  int poll_num;    //for recording poll number
+  int window;     //for recording window number
 };
 
 struct flowset_id_struct{

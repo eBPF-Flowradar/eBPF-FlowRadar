@@ -77,6 +77,7 @@
 4. alen_circular_queue - flowradar with detection log collection at every epoch
    alen_window_detection - flowradar with detection log collection at every time window per epoch
    alen_single_flowset - alen_window_detection with only single flowset
+5. collisions_by_allflows done at user space (not in ebpf)
 
 # Resources to setup veth
 1. Run setup_br.sh

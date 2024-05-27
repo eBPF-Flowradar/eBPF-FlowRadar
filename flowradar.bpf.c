@@ -115,6 +115,11 @@ insert_flow_to_counting_table(__u128 flow_key, bool old_flow,struct flowset *cur
 
     struct counting_table_entry cte =curr_flowset->counting_table[hashIndex];
 
+    //for detection mechanism
+    if(cte.flowCount==1){
+      curr_flowset->purecell_all_collision++;
+    }
+
     if(old_flow){
       cte.packetCount++;
     }else{
@@ -135,11 +140,11 @@ insert_flow_to_counting_table(__u128 flow_key, bool old_flow,struct flowset *cur
   }
 
   if(num_collisions==COUNTING_TABLE_HASH_COUNT){
-    curr_flowset->num_flows_collide_all_indices++;
+    curr_flowset->completely_colliding_flows++;
   }
 
   if(num_new==COUNTING_TABLE_HASH_COUNT){
-    curr_flowset->num_flows_all_new_cells++;
+    curr_flowset->non_colliding_flows++;
   }
 
   return 0;
@@ -251,6 +256,7 @@ int xdp_parse_flow(struct xdp_md *ctx) {
       old_flow = true;
     } else {
       insert_to_flow_filter(flow_key,curr_flowset);
+      curr_flowset->input_flows++;   //counting number of unique flows
     }
 
     insert_flow_to_counting_table(flow_key, old_flow,curr_flowset);

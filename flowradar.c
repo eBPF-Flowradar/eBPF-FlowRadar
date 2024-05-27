@@ -175,8 +175,9 @@ static void *detection_logs_thread(){
     if(!ring_buf_pop(&detection_ring_buffer,&flow_set)){
 
       //Data for detection mechanism
-      int numHashCollisions=0;
-      int num_purecells=0;
+      int collisions_by_allflows=0;
+      int purecell_count_before_decode=0;
+      int cells_occupied_epochend=0;  //num of cells occupied at the end of a window
 
       for(int i=0;i<COUNTING_TABLE_SIZE;i++){
 
@@ -187,12 +188,13 @@ static void *detection_logs_thread(){
         // }
 
         //all flows
-        if(cte.packetCount>1){
-          numHashCollisions+=cte.packetCount-1;
+        if(cte.packetCount>0){
+          collisions_by_allflows+=cte.packetCount-1;
+          cells_occupied_epochend++;
         }
 
         if(cte.flowCount==1){
-          num_purecells++;
+          purecell_count_before_decode++;
         }
 
       }
@@ -206,14 +208,18 @@ static void *detection_logs_thread(){
         // return;  // or handle the error as needed
         int_exit(1);
       }
-      fprintf(fptr,"%d,%d,%d,%d,%d,%d,%d\n",
+      fprintf(fptr,"%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
               flow_set.poll_num,
               flow_set.window,
               flow_set.pkt_count,
-              num_purecells,
-              numHashCollisions,
-              flow_set.num_flows_collide_all_indices,
-              flow_set.num_flows_all_new_cells);
+              flow_set.input_flows,
+              flow_set.completely_colliding_flows,
+              flow_set.non_colliding_flows,
+              cells_occupied_epochend,
+              purecell_count_before_decode,
+              flow_set.purecell_all_collision,
+              collisions_by_allflows
+              );
       fclose(fptr);
       // printf("Write complete\n");
       printf("Detection Logs: Elements left in detection ring buffer:%d\n",detection_ring_buffer.count);
@@ -238,8 +244,9 @@ static void start_decode() {
       double pktCount[COUNTING_TABLE_SIZE];  //double because to use in gsl
       
       //Data for detection mechanism
-      int numHashCollisions=0;    
-      int num_purecells=0;
+      int collisions_by_allflows=0;    
+      int purecell_count_before_decode=0;
+      int cells_occupied_epochend=0; //num of cells occupied at the end of an epoch
 
       // printf("FlowXOR ,FlowCount ,PacketCount\n");
       for(int i=0;i<COUNTING_TABLE_SIZE;i++){
@@ -253,12 +260,13 @@ static void start_decode() {
         // }
 
         //all flows
-        if(cte.packetCount>1){
-          numHashCollisions+=cte.packetCount-1;
+        if(cte.packetCount>0){
+          collisions_by_allflows+=cte.packetCount-1;
+          cells_occupied_epochend++;
         }
 
         if(cte.flowCount==1){
-          num_purecells++;
+          purecell_count_before_decode++;
         }
 
         // if(cte.flowXOR){
@@ -324,13 +332,17 @@ static void start_decode() {
         perror("Failed to open DETECTION_LOG_FILE");
         return;  // or handle the error as needed
       }
-      fprintf(fptr,"%d,%d,%d,%d,%d,%d\n",
+      fprintf(fptr,"%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
               flow_set.poll_num,
               flow_set.pkt_count,
-              num_purecells,
-              numHashCollisions,
-              flow_set.num_flows_collide_all_indices,
-              flow_set.num_flows_all_new_cells);
+              flow_set.input_flows,
+              flow_set.completely_colliding_flows,
+              flow_set.non_colliding_flows,
+              cells_occupied_epochend,
+              purecell_count_before_decode,
+              flow_set.purecell_all_collision,
+              collisions_by_allflows
+            );
       fclose(fptr);
       // printf("Write complete\n");
 
@@ -436,7 +448,7 @@ int main(int argc, char *argv[]) {
         // return;  // or handle the error as needed
         int_exit(1);
   }
-  fprintf(fptr,"Poll_Num,Pkt_Count,Pure_Cells_Num,Hash_Collisions_Num,Flows_Collide_All_Indices_Num,Flows_Set_All_New_Cells_Num\n");
+  fprintf(fptr,"Poll_Num,Pkt_Count,input_flows,completely_colliding_flows,non_colliding_flows,cells_occupied_epochend,purecell_count_before_decode,purecell_all_collision,collisions_by_allflows\n");
   fclose(fptr);
 
 
@@ -446,7 +458,7 @@ int main(int argc, char *argv[]) {
         // return;  // or handle the error as needed
         int_exit(1);
   }
-  fprintf(fptr,"Poll_Num,Time_Window,Pkt_Count,Pure_Cells_Num,Hash_Collisions_Num,Flows_Collide_All_Indices_Num,Flows_Set_All_New_Cells_Num\n");
+  fprintf(fptr,"Poll_Num,Time_Window,Pkt_Count,input_flows,completely_colliding_flows,non_colliding_flows,cells_occupied_epochend,purecell_count_before_decode,purecell_all_collision,collisions_by_allflows\n");
   fclose(fptr);
 
 
