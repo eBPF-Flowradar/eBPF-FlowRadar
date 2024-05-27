@@ -79,6 +79,11 @@
    alen_single_flowset - alen_window_detection with only single flowset
 5. collisions_by_allflows done at user space (not in ebpf)
 
+# Observations
+1. For caida ground_truth input flows is 24040 but the actual number of flows is 24089. The single decode flow count is 24040, which means false positives of the flow filter causes loss of flows.
+
+
+
 # Resources to setup veth
 1. Run setup_br.sh
 2. Check https://linuxconfig.org/how-to-use-bridged-networking-with-libvirt-and-kvm to setup with virt-manager
