@@ -1,9 +1,11 @@
 import socket
 import subprocess
+import os
 
 def start_server(server_socket):
 	conn, addr = server_socket.accept()
 	print("COnnection ACCEPTED")
+	count = 0
 	while True:
 		data = conn.recv(80).decode()
 		data = data.rstrip("\x00")
