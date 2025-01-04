@@ -2,6 +2,12 @@ import socket
 import subprocess
 import os
 
+
+def send_command(client_socket, command, host='192.168.124.158', port=8005):
+    bytes_padded = 80 - len(command)
+    command = command + '\x00' * bytes_padded
+    client_socket.sendall(command.encode('utf-8'))    
+
 def start_server(server_socket):
 	conn, addr = server_socket.accept()
 	print("COnnection ACCEPTED")
@@ -12,8 +18,13 @@ def start_server(server_socket):
 		if not data:
 			break
 		print(f"Received command: {data}")
-		cmd1 =  subprocess.Popen(['echo', 'rajesh@2003'], stdout=subprocess.PIPE)
-		process = subprocess.Popen(data.split(" "), stdin=cmd1.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE);
+		if data == './flowradar enp2s0':
+			print("Hello World")
+			process = subprocess.Popen(data.split(" "), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE);
+			send_command(conn, "ACK")
+		else:
+			os.system(data)
+			send_command(conn, "ACK")
 	conn.close()
 
 if __name__ == '__main__':
