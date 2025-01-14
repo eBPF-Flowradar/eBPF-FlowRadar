@@ -1,0 +1,5 @@
+Poll_Num,Time_Window,Pkt_Count,input_flows,completely_colliding_flows,non_colliding_flows,cells_occupied_epochend,purecell_count_before_decode,purecell_all_collision,collisions_by_allflows
+1,1,4411,1392,0,1015,5074,4670,10994,12435
+1,2,11101,3290,11,1606,10706,8637,25559,33604
+1,3,14584,4259,33,1742,13119,9868,33012,45217
+1,4,14584,4259,33,1742,13119,9868,33012,45217
