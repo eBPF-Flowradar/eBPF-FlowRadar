@@ -68,6 +68,7 @@ struct flowset {
   int completely_colliding_flows;  //no. of flows that collide on all of their hash indices
   int non_colliding_flows;  //no. of flows that do not collide on all of their hash indices
   int purecell_all_collision; //number of collisions observed on pure cells
+  int num_flows_classified_as_old;
   int poll_num;    //for recording poll number
   int window;     //for recording window number
 };

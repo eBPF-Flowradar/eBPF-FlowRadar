@@ -254,6 +254,7 @@ int xdp_parse_flow(struct xdp_md *ctx) {
     //checking whether old flow and insert if its not
     if (is_old_flow(flow_key,curr_flowset)) {
       old_flow = true;
+      curr_flowset->num_flows_classified_as_old++;
     } else {
       insert_to_flow_filter(flow_key,curr_flowset);
       curr_flowset->input_flows++;   //counting number of unique flows

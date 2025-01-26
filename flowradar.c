@@ -208,13 +208,14 @@ static void *detection_logs_thread(){
         // return;  // or handle the error as needed
         int_exit(1);
       }
-      fprintf(fptr,"%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+      fprintf(fptr,"%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
               flow_set.poll_num,
               flow_set.window,
               flow_set.pkt_count,
               flow_set.input_flows,
               flow_set.completely_colliding_flows,
               flow_set.non_colliding_flows,
+              flow_set.num_flows_classified_as_old,
               cells_occupied_epochend,
               purecell_count_before_decode,
               flow_set.purecell_all_collision,
