@@ -17,27 +17,39 @@
 
 
 static int ifindex;
-struct xdp_program *prog = NULL;
-int first=0; //used for accessing the only element in flowset_id
-pthread_t thread_id;
+static struct xdp_program *prog = NULL;
+static int first=0; //used for accessing the only element in flowset_id
+
 
 
 //defining ring buffer
-struct flowset buffer[RING_BUFFER_SIZE];
-struct ring_buffer flowset_ring_buffer ={
+static struct flowset buffer[RING_BUFFER_SIZE];
+static struct ring_buffer flowset_ring_buffer ={
   .buffer=buffer,
   .head=0,
   .tail=0,
+  .count=0,
   .maxlen=RING_BUFFER_SIZE
 };
 
+//defining detection ring buffer
+static struct flowset detection_buffer[DETECTION_RING_BUFFER_SIZE];
+static struct ring_buffer detection_ring_buffer={
+  .buffer=detection_buffer,
+  .head=0,
+  .tail=0,
+  .count=0,
+  .maxlen=DETECTION_RING_BUFFER_SIZE
+};
+
+
 
 //relying on automatic init by compiler
-struct flowset empty_flowset;
+static struct flowset empty_flowset;
 
 
 static void int_exit(int sig) {
-  pthread_cancel(thread_id);
+  // pthread_cancel(thread_id);
   xdp_program__detach(prog, ifindex, XDP_MODE_SKB, 0);
   xdp_program__close(prog);
   exit(sig);
@@ -52,21 +64,20 @@ static void inline initialize_flowset(int flowset_fd){
 
 
 //copies flowset from eBPF map to ring buffer and switches flowset in kernel space
-void *flowset_switcher_thread(void *arg){
+static void *flowset_switcher_thread(void *arg){
 
-  int loop=0;
+  int poll=1;
   struct thread_args *args = (struct thread_args*)arg;
 
   int flowset_fd_0=args->flowset_fd_0;
   int flowset_fd_1=args->flowset_fd_1;
   int flowset_id_fd=args->flowset_id_fd;
 
+  FILE *fptr;
+
   while(true){
 
-    usleep(POLL_TIME_US);
-    loop++;
-    printf("\nPoll No : %d\n", loop);
-
+    // usleep(POLL_TIME_US);
     struct flowset flow_set;
 
     //Get map currently in use
@@ -74,16 +85,48 @@ void *flowset_switcher_thread(void *arg){
     int curr_flowset_fd;
     bpf_map_lookup_elem(flowset_id_fd, &first, &current);
 
+    // printf("\nPoll No : %d\n", poll);
 
     if(current.id){
       curr_flowset_fd=flowset_fd_1;
-      printf("Flowset 1 in use\n");
+      // printf("Flowset 1 in use\n");
     }else{
       curr_flowset_fd=flowset_fd_0;
-      printf("Flowset 0 in use\n");
+      // printf("Flowset 0 in use\n");
     }
-  
-    printf("Inverting the flowset\n");
+
+    //detection mechanism
+    for(int window=1;window<=DETECTION_WINDOWS_PER_EPOCH;window++){
+
+      usleep(DETECTION_TIME_WINDOW_US);
+      // printf("Detection time window: %d/%d\n",window,DETECTION_WINDOWS_PER_EPOCH);
+
+
+      // printf("Getting the flowset from kernel space\n");
+      bpf_map_lookup_elem(curr_flowset_fd,&first,&flow_set);
+
+      //if flowset empty, not required to proceed
+      if(flow_set.pkt_count==0){
+        // printf("Flowset empty!!!\n");
+        continue;
+      }
+
+      //insert poll and window info to flowset
+      flow_set.poll_num=poll;
+      flow_set.window=window;
+
+      if(ring_buf_push(&detection_ring_buffer,flow_set)){
+        fprintf(stderr,"Error: detection_ring_buffer full\n");
+        int_exit(1);
+      }
+      printf("Flow Switcher: Number of elements in the detection ring buffer: %d\n",detection_ring_buffer.count);
+
+
+    }
+
+
+
+    // printf("Inverting the flowset\n");
     //invert Flowset_ID
     current.id=!(current.id);
     //wait till lock release to update
@@ -92,26 +135,96 @@ void *flowset_switcher_thread(void *arg){
     //   return ret;
     // }
 
-    printf("Getting the flowset from kernel space\n");
+    // printf("Getting the flowset from kernel space\n");
     bpf_map_lookup_elem(curr_flowset_fd,&first,&flow_set);
 
     if(flow_set.pkt_count==0){
-      printf("Flowset empty!!!\n");
+      // printf("Flowset empty!!!\n");
+      poll++;
       continue;
     }
 
-    //add the flowset to ring buffer, if full exit
-    if(ring_buf_push(&flowset_ring_buffer,flow_set)){
-      printf("Ring buffer full\n");
-      // pthread_exit(NULL);
-      int_exit(1);
-    }
+    // printf("\nFlow Switcher: Poll No : %d Number of Packets:%d\n", poll,flow_set.pkt_count);
+
+    //insert poll info to flowset
+    flow_set.poll_num=poll;
 
     //reset the flowset 
-    printf("Reset the flowset in kernel space\n");
+    // printf("Reset the flowset in kernel space\n");
     initialize_flowset(curr_flowset_fd);
 
+    //add the flowset to ring buffer, if full wait till free space
+    while(ring_buf_push(&flowset_ring_buffer,flow_set)){
+      printf("--------------------------------------------------------------\n");
+      printf("Flow Switcher: Ring buffer full. Waiting for %d seconds\n",RING_BUFFER_FULL_WAIT_TIME);
+      printf("--------------------------------------------------------------\n");
+      sleep(RING_BUFFER_FULL_WAIT_TIME);
+    }
+    printf("Flow Switcher: Number of elements in the ring buffer: %d\n",flowset_ring_buffer.count);
+    poll++;
+  }
+}
 
+
+static void *detection_logs_thread(){
+
+  struct flowset flow_set;
+
+  while(true){
+
+    if(!ring_buf_pop(&detection_ring_buffer,&flow_set)){
+
+      //Data for detection mechanism
+      int collisions_by_allflows=0;
+      int purecell_count_before_decode=0;
+      int cells_occupied_epochend=0;  //num of cells occupied at the end of a window
+
+      for(int i=0;i<COUNTING_TABLE_SIZE;i++){
+
+        struct counting_table_entry cte=flow_set.counting_table[i];
+        //only new flows
+        // if(cte.flowCount>1){
+        //   numHashCollisions+=cte.flowCount-1;
+        // }
+
+        //all flows
+        if(cte.packetCount>0){
+          collisions_by_allflows+=cte.packetCount-1;
+          cells_occupied_epochend++;
+        }
+
+        if(cte.flowCount==1){
+          purecell_count_before_decode++;
+        }
+
+      }
+
+      //Writing to detection log file
+      // printf("\nWriting to Window Detection Log file\n");
+      FILE *fptr;
+      fptr=fopen(TIME_WINDOW_DETECTION_LOG_FILE,"a");
+      if (fptr == NULL) {
+        perror("Failed to open TIME_WINDOW_DETECTION_LOG_FILE");
+        // return;  // or handle the error as needed
+        int_exit(1);
+      }
+      fprintf(fptr,"%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+              flow_set.poll_num,
+              flow_set.window,
+              flow_set.pkt_count,
+              flow_set.input_flows,
+              flow_set.completely_colliding_flows,
+              flow_set.non_colliding_flows,
+              flow_set.num_flows_classified_as_old,
+              cells_occupied_epochend,
+              purecell_count_before_decode,
+              flow_set.purecell_all_collision,
+              collisions_by_allflows
+              );
+      fclose(fptr);
+      // printf("Write complete\n");
+      printf("Detection Logs: Elements left in detection ring buffer:%d\n",detection_ring_buffer.count);
+    }
   }
 }
 
@@ -127,9 +240,14 @@ static void start_decode() {
 
     if(!ring_buf_pop(&flowset_ring_buffer,&flow_set)){
 
+      
 
       double pktCount[COUNTING_TABLE_SIZE];  //double because to use in gsl
-      int numHashCollisions=0;    //Data for detection mechanism
+      
+      //Data for detection mechanism
+      int collisions_by_allflows=0;    
+      int purecell_count_before_decode=0;
+      int cells_occupied_epochend=0; //num of cells occupied at the end of an epoch
 
       // printf("FlowXOR ,FlowCount ,PacketCount\n");
       for(int i=0;i<COUNTING_TABLE_SIZE;i++){
@@ -137,8 +255,19 @@ static void start_decode() {
         struct counting_table_entry cte=flow_set.counting_table[i];
         pktCount[i]=cte.packetCount;
 
-        if(cte.flowCount>1){
-          numHashCollisions+=cte.flowCount-1;
+        //only new flows
+        // if(cte.flowCount>1){
+        //   numHashCollisions+=cte.flowCount-1;
+        // }
+
+        //all flows
+        if(cte.packetCount>0){
+          collisions_by_allflows+=cte.packetCount-1;
+          cells_occupied_epochend++;
+        }
+
+        if(cte.flowCount==1){
+          purecell_count_before_decode++;
         }
 
         // if(cte.flowXOR){
@@ -151,34 +280,37 @@ static void start_decode() {
       }
 
 
-      printf("Number of packets in flowset:%d\n",flow_set.pkt_count);
+      // printf("Number of packets in flowset:%d\n",flow_set.pkt_count);
 
       //perform single decode and print the purecells
       struct pureset pure_set;
       pure_set.latest_index=0;
       //perform single decode till there are no pure cells left
-      printf("\nStarting single decode\n");
-      while(check_purecells(&flow_set)){
+      // printf("\nStarting single decode\n");
+      int init_index=0;  //index of the first purecell
+      while((init_index=check_purecells(&flow_set))!=-1){
 
-        single_decode(&flow_set,&pure_set);
+        if(single_decode(&flow_set,&pure_set,init_index)){
+          return;
+        }
 
       }
 
-      int num_purecells=pure_set.latest_index;
-      printf("Single Decode Complete.....\nNumber of PureCells:%d\n",num_purecells);
+      int num_flows=pure_set.latest_index;
+      // printf("Single Decode Complete.....\nNumber of PureCells:%d\n",num_purecells);
 
-      printf("Writing to log file\n");
+      // printf("Writing to log file\n");
       FILE *fptr;
       fptr=fopen(SINGLE_DECODE_LOG_FILE,"a");
 
       if (fptr == NULL) {
-        perror("Error opening file");
+        perror("Failed to open SINGLE_DECODE_LOG_FILE");
         return;  // or handle the error as needed
       }
 
-      for (int i = 0; i < num_purecells; i++) {
+      for (int i = 0; i < num_flows; i++) {
 
-        //printing the purecells
+        //printing the flows
         //printf("%" PRIx64 "%016" PRIx64 "\n",
         //(uint64_t)(pure_set.purecells[i] >> 64),
         //(uint64_t)pure_set.purecells[i]);
@@ -191,29 +323,39 @@ static void start_decode() {
       }
 
       fclose(fptr);
-      printf("Write complete\n");
+      // printf("Write complete\n");
 
       
       //Writing to detection log file
-      printf("\nWriting to Detection Log file\n");
+      // printf("\nWriting to Detection Log file\n");
       fptr=fopen(DETECTION_LOG_FILE,"a");
       if (fptr == NULL) {
-        perror("Error opening file");
+        perror("Failed to open DETECTION_LOG_FILE");
         return;  // or handle the error as needed
       }
-      fprintf(fptr,"%d,%d,%d,%d\n",
-              num_purecells,
-              numHashCollisions,
-              flow_set.num_flows_collide_all_indices,
-              flow_set.num_flows_all_new_cells);
+      fprintf(fptr,"%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+              flow_set.poll_num,
+              flow_set.pkt_count,
+              flow_set.input_flows,
+              flow_set.completely_colliding_flows,
+              flow_set.non_colliding_flows,
+              cells_occupied_epochend,
+              purecell_count_before_decode,
+              flow_set.purecell_all_collision,
+              collisions_by_allflows
+            );
       fclose(fptr);
-      printf("Write complete\n");
+      // printf("Write complete\n");
 
       
       //perform counter decode
-      printf("\nStarting Counter Decode\n");
-      counter_decode(&pure_set,pktCount);
-        
+      // printf("\nStarting Counter Decode\n");
+      // if(counter_decode(&pure_set,pktCount)){
+      //   return;
+      // }
+
+      printf("Main Thread: Number of elements left in the ring buffer: %d\n",flowset_ring_buffer.count);  
+
     }
 
   }
@@ -224,12 +366,14 @@ int main(int argc, char *argv[]) {
   int prog_fd, map_fd, ret;
   struct bpf_object *bpf_obj;
 
+  pthread_t flow_switcher_thread_id,detection_logs_thread_id;
+
   //check if necessary (setting resource limits to infinity)
   struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
 
   // IS THIS NECESSARY
   if (setrlimit(RLIMIT_MEMLOCK, &r)) {
-    fprintf(stderr, "ERROR:failed to set rlimit\n");
+    perror("Failed to set rlimit");
     return 1;
   }
 
@@ -244,21 +388,21 @@ int main(int argc, char *argv[]) {
 
   ifindex = if_nametoindex(argv[1]);
   if (!ifindex) {
-    printf("Getting ifindex from interface name failed\n");
+    perror("Failed to get ifindex from interface name");
     return 1;
   }
 
   /* load XDP object by libxdp */
   prog = xdp_program__open_file("flowradar.o", "xdp", NULL);
   if (!prog) {
-    printf("Error, load xdp prog failed\n");
+    perror("Failed to load XDP Program");
     return 1;
   }
 
   // MAYBE CHANGE to XDP_MODE_NATIVE
   ret = xdp_program__attach(prog, ifindex, XDP_MODE_SKB, 0);
   if (ret) {
-    printf("Error, Set xdp fd on %d failed\n", ifindex);
+    perror("Failed to attach XDP Program");
     return ret;
   }
 
@@ -270,22 +414,54 @@ int main(int argc, char *argv[]) {
 
   //get fd of flowset_id
   int Flowset_id_fd=bpf_object__find_map_fd_by_name(bpf_obj, "Flowset_ID");
+  int start_fd=bpf_object__find_map_fd_by_name(bpf_obj,"start");
 
 
   initialize_flowset(Flowset_fd_0);
   initialize_flowset(Flowset_fd_1);
 
   //initialize Flowset_ID
-  bool set=false;
+  struct flowset_id_struct set;
+  set.id=false;
+  // bool set=false;
   bpf_map_update_elem(Flowset_id_fd, &first, &set, BPF_ANY);
   // if(ret<0){
   //   return ret;
   // }
 
+  //initialize start
+  bool start_bool=false;
+  bpf_map_update_elem(start_fd,&first,&start_bool,BPF_ANY);
+
+
   //remove log files if exist
   remove(SINGLE_DECODE_LOG_FILE);
   remove(COUNTER_DECODE_LOG_FILE);
   remove(DETECTION_LOG_FILE);
+  remove(TIME_WINDOW_DETECTION_LOG_FILE);
+
+  //add headers to detection log files
+  FILE *fptr;
+
+  fptr=fopen(DETECTION_LOG_FILE,"a");
+  if (fptr == NULL) {
+        perror("Failed to open DETECTION_LOG_FILE");
+        // return;  // or handle the error as needed
+        int_exit(1);
+  }
+  fprintf(fptr,"Poll_Num,Pkt_Count,input_flows,completely_colliding_flows,non_colliding_flows,cells_occupied_epochend,purecell_count_before_decode,purecell_all_collision,collisions_by_allflows\n");
+  fclose(fptr);
+
+
+  fptr=fopen(TIME_WINDOW_DETECTION_LOG_FILE,"a");
+  if (fptr == NULL) {
+        perror("Failed to open TIME_WINDOW_DETECTION_LOG_FILE");
+        // return;  // or handle the error as needed
+        int_exit(1);
+  }
+  fprintf(fptr,"Poll_Num,Time_Window,Pkt_Count,input_flows,completely_colliding_flows,non_colliding_flows,cells_occupied_epochend,purecell_count_before_decode,purecell_all_collision,collisions_by_allflows\n");
+  fclose(fptr);
+
 
   //prepare arguments to the thread
   struct thread_args args;
@@ -293,14 +469,19 @@ int main(int argc, char *argv[]) {
   args.flowset_fd_1=Flowset_fd_1;
   args.flowset_id_fd=Flowset_id_fd;
 
-
-  //create thread for flowset switcher
-  pthread_create(&thread_id,NULL,flowset_switcher_thread,(void*)&args);
+  printf("Waiting for packets to arrive\n");
+  while(!start_bool){
+    bpf_map_lookup_elem(start_fd,&first,&start_bool);
+  }
+  
+  //create thread for flowset switcher and detection logs thread
+  pthread_create(&flow_switcher_thread_id,NULL,flowset_switcher_thread,(void*)&args);
+  pthread_create(&detection_logs_thread_id,NULL,detection_logs_thread,NULL);
 
 
   printf("\nStarting Decode function\n");
   start_decode();
 
-  int_exit(0);
+  int_exit(1);
   return 0;
 }

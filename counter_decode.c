@@ -30,7 +30,7 @@ int counter_decode(struct pureset *pure_set, double *pktCount) {
 
 
   if (!A || !x || !B || !cov || !work) {
-    fprintf(stderr, "Memory allocation failed\n");
+    perror("Failed to allocate memory");
     return -1;
   }
 
@@ -57,18 +57,18 @@ int counter_decode(struct pureset *pure_set, double *pktCount) {
 
   
   // Perform least squares fitting
-  printf("Solving equations!!\n");
+  // printf("Solving equations!!\n");
   gsl_multifit_linear(A, B, x, cov, &chisq, work);
 
   
-  printf("Counter Decode complete...\n");
+  // printf("Counter Decode complete...\n");
 
-  printf("Writing to log file\n");
+  // printf("Writing to log file\n");
   FILE *fptr;
   fptr=fopen(COUNTER_DECODE_LOG_FILE,"a");
 
   if (fptr == NULL) {
-    perror("Error opening file");
+    perror("Failed to open COUNTER_DECODE_LOG_FILE");
     return -1;  // or handle the error as needed
   }
 
@@ -84,11 +84,13 @@ int counter_decode(struct pureset *pure_set, double *pktCount) {
     fprintf(fptr,"%" PRIx64 "%016" PRIx64",",
              (uint64_t)(pure_set->purecells[i] >> 64),
              (uint64_t)pure_set->purecells[i]);
-    fprintf(fptr,"%d\n",(int)round(gsl_vector_get(x,i)));  //rounding off to nearest integer
+    int cnt=(int)round(gsl_vector_get(x,i));
+    cnt=cnt>0?cnt:1;
+    fprintf(fptr,"%d\n",cnt);  //rounding off to nearest integer
   }
 
   fclose(fptr);
-  printf("Write complete\n");
+  // printf("Write complete\n");
 
   // Free memory that is used
   gsl_multifit_linear_free(work);

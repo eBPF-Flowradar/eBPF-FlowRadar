@@ -10,13 +10,13 @@
 9. Should there be IPv6 support?
 10. Added ethernet headers to packets using scapy, certain metadata is missing from the packet (flow id and time is maintatined)
 11. How are you guys doing counter decode? In P4 or simulating in python
-12. Sleeping for 280ms is implemented through usleep. Wont be accurate. Is that enough?
+12. Sleeping for 280ms is implemented through usleep. Wont be accurate. Is that enough?[x] (now collection done in seperate thread)
 13. Currently packets gets inserted into 2 or 3 flowsets. Should all packets be inserted into the same flowset?[x]
 14. How are you guys dealing with fragmented IP packets? (packet 34 in pcap UDP with src/dst port=0)(when these packets are considered the flow count becomes as you said :24089)[x]
 15. Pureflows (7359) when flows in a single flowset (Error :#3)[x]
 16. Can you provide pcaps with malicious flows for testing (consistency)
 17. MAX_PKT_COUNT while generating mal_flows[x]
-18. Tell about our testing results, ask for pcap files for consistent results
+
 
 # Check
 1. Check all TODOs
@@ -37,7 +37,7 @@
 1. Pureset need not be a set as the flows added will be unique always [x]
 2. Change implementation of single decode to perform it until no pure cells exist [x]
 3. delay before start_decode function [x]
-4. Unload the XDP program on error
+4. Unload the XDP program on error[x]
 5. Continue the loop if counting table empty in start_decode [x]
 6. Replace the bpf maps with support for locks[x]
     - [lwn article on BPF spinlocks](https://lwn.net/Articles/779120/)
@@ -50,6 +50,10 @@
 12. Remove unwanted memcpy to 128 bit before insertion
 13. Support for IPv6?
 14. Make a circular queue structure for flowset [x][resource](https://embedjournal.com/implementing-circular-buffer-embedded-c/)
+15. Remove veth (uneccasary)[x]
+16. Make the window collection to a queue and process on a seperate thread[x]
+17. Try to make RCU update in ebpf code (update the map at the end)
+18. Solve the error due to pureset_index exceeeding size of pureset (It occurs only sometimes)
 
 # Errors
 1. Errors due to empty flowsets being passed down to gsl [x]
@@ -64,13 +68,23 @@
 5.`tcprewrite --dlt=enet --enet-dmac=00:11:22:33:44:55 --enet-smac=66:77:88:99:AA:BB --infile=input.pcap --outfile=output.pcap`[Adding fake ethernet headers (but not working)](https://edeca.net/post/2011-06-20-adding-fake-ethernet-headers-to-pcap-files/)
 6.`sudo tcpreplay -i veth1 output_with_eth.pcap`  [refer](https://tcpreplay.appneta.com/wiki/tcpreplay)
 7. `sudo pkill -f flowradar` :Kill flowradar process
+8. sudo tcpreplay -i br0 --mbps=177.89  analysis/pcap_files/ground_truth/output_with_eth.pcap (0.274220s)
 
 # Notes
 1. The 110k_24k_caida.pcap has raw ip packets without the ethernet header, this causes issues with our program as it expects ethernet headers, currently while testing with scapy we are adding the ethernet headers and sending to the interface.
 2. Only supporting IP packets (no IPv6)
 3. Counter decode done with gsl library.Packets rounded to nearest integer after calculation (instead of simplifying the calculation)
+4. alen_circular_queue - flowradar with detection log collection at every epoch
+   alen_window_detection - flowradar with detection log collection at every time window per epoch
+   alen_single_flowset - alen_window_detection with only single flowset
+5. collisions_by_allflows done at user space (not in ebpf)
+
+# Observations
+1. For caida ground_truth input flows is 24040 but the actual number of flows is 24089. The single decode flow count is 24040, which means false positives of the flow filter causes loss of flows.
+
+
 
 # Resources to setup veth
-1. Run setup_veth.sh
+1. Run setup_br.sh
 2. Check https://linuxconfig.org/how-to-use-bridged-networking-with-libvirt-and-kvm to setup with virt-manager
 3. Add interface to virt-manager and ensure the interface is up
