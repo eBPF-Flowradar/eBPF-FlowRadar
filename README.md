@@ -2,8 +2,8 @@
 
 Read about the [project](report.pdf)
 
-## Design Diagram
-![Architecture](flowradar_design.jpeg)
+## Architecture Diagram
+![Architecture Diagram](flowradar_design.jpeg)
 
 ## Build
 ```sh
